@@ -7,6 +7,7 @@ public class MyPoint extends Point {
 	public double angle; // Winkel in Grad
 	public double x_coordinate, y_coordinate;
 	public int index ; // for removing hidden Points from the list
+	public boolean isReflex;
 
 	public MyPoint(int x, int y) {
 		this.x = x;

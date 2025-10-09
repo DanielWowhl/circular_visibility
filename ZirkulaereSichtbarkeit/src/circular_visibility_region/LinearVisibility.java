@@ -65,8 +65,8 @@ public class LinearVisibility {
 			if (isBeforeCCW(poly.get(i).end2.angle, cMax)) {
 
 				// if reflex, then we have a CCW door.
-				if (Calculator.calculation_of_angle(poly.get(i - 1).start2, poly.get((i) % poly.size()).start2,
-						poly.get((i + 1) % poly.size()).start2) > 180) {
+				if (poly.get(i).start2.isReflex) {
+					
 					// calculate the first intersection for i+2 till size (i mean use i+1), by
 					// saving it
 					intRes = findDoor(observer, poly.get(i).start, poly, (i + 1));
@@ -90,7 +90,7 @@ public class LinearVisibility {
 				else {
 					// CW door
 					// if (!(reflexvertex && next >= reflexvertex))
-					int error=0;
+					int error=0; // for safety
 					while (!(Calculator.isVertexVisible(poly, observer, poly.get((i)%n).start2))||(Calculator.calculation_of_angle(poly.get((i - 1+n)%n).start2, poly.get((i) % poly.size()).start2,
 							poly.get((i) % poly.size()).end2) < 180
 							|| isBeforeCCW(poly.get((i) % poly.size()).end2.angle,
@@ -99,7 +99,7 @@ public class LinearVisibility {
 						i++;
 						error++;
 						if (error == n) {
-							throw new IllegalArgumentException("Punkt außerhalb des Polygons!");
+							throw new IllegalArgumentException("Point not in Polygon!");
 						}
 					}
 					// else we have found a possible door

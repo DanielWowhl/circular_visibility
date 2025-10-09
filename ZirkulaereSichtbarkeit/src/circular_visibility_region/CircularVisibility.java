@@ -15,100 +15,322 @@ public class CircularVisibility {
 		List<Cap> caps = new ArrayList<>();
 		int n = poly.size();
 		Cap result;
-
+		int pocketNr = 0;
 		// for each Pocket, find all convex and concave caps
 		for (DoorSegment dSegment : doors) {
 
 			if (!dSegment.ccw) {
 				// CW Pocket
 				// find convex Caps
-				MyPoint next = null; // for skipping to edge, where the old cap ends.
+				MyPoint next = null; // for skipping to edge, where the cap ends.
 				MyPoint last = dSegment.chain.getLast();
 				for (MyPoint s2 : dSegment.chain) {
 					if (next == null || next.index < s2.index) { // if not skipped, start calculating
 						// if convex Vertex, and not the "onEdge" of the doorsegment, as the index is
 						// off by 1.
-						if (Calculator.calculation_of_angle(poly.get((s2.index - 1 + n) % n).start2, s2,
-								poly.get((s2.index + 1) % n).start2) > 180 && s2 != last) {
+						if (s2.isReflex && s2 != last) {
 							result = findConvexCap(s2, dSegment, poly, observer);
 							if (result != null) {
+								result.pocketNr = pocketNr;
 								caps.add(result);
 								next = result.q;
 							}
 						}
 					}
 				}
-				
+
 				// find concave Caps
-				// TODO Find Concave Caps
+				Edge e;
+				next = null; // for skipping to edge, where the cap ends.
+				// starting at r' = dSegment.onEdge, we go to r = dSegment.reflexVertrx
+				for (int i = dSegment.chain.size() - 1; i > 0; i--) {
+					if (next == null || next.index + 1 >= dSegment.chain.get(i).index) {
+						e = new Edge(dSegment.chain.get(i), dSegment.chain.get(i - 1));
+						result = findConcaveCap(e, dSegment, poly, observer);
+						if (result != null) {
+							result.pocketNr = pocketNr;
+							caps.add(result);
+							next = result.q;
+						}
+					}
+				}
+				pocketNr++;
 			} else {
 				// CCW Pocket
+				// find convex Caps
 				// idea: we traverse it backwards, so that the reflex vertex, that cuts our
 				// linear view, is, just as in the CCW pocket, the first tested vertex for caps.
-				MyPoint next = null; // for skipping to edge, where the old cap ends.
+				MyPoint next = null; // for skipping to edge, where the cap ends.
 				MyPoint last = dSegment.chain.getFirst();
 				for (int i = (dSegment.chain.size() - 1); i >= 0; i--) {
 					MyPoint s2 = dSegment.chain.get(i);
-					if (next == null || next.index > s2.index) {
+					if (next == null || next.index >= s2.index) {
 						if (Calculator.calculation_of_angle(
 								poly.get(((dSegment.chain.get(i).index) + n - 1) % n).start2, s2,
 								poly.get(dSegment.chain.get(i).index).end2) > 180 && s2 != last) {
 							result = findConvexCap(s2, dSegment, poly, observer);
 							if (result != null) {
+								result.pocketNr = pocketNr;
 								caps.add(result);
 								next = result.q;
-								// TODO ADD THE SKIP
 							}
 						}
 					}
-
 				}
-			// find convex Caps
-
-			// find concave Caps
+				// find concave Caps
+				Edge e;
+				next = null;
+				for (int i = 0; i < dSegment.chain.size() - 1; i++) {
+					if (next == null || next.index - 1 < dSegment.chain.get(i).index) { // HUH?
+						e = new Edge(dSegment.chain.get(i), dSegment.chain.get(i + 1));
+						result = findConcaveCap(e, dSegment, poly, observer);
+						if (result != null) {
+							result.pocketNr = pocketNr;
+							caps.add(result);
+							next = result.q;
+						}
+					}
+				}
 			}
-
+			pocketNr++;
 		}
-		// TODO "merge" caps, by deleting all caps that are "inside" of another cap, meaning: the point s2-q or s4-q are between another cap s2-q or s4-q respectively.
-		
 		return caps;
-		// return
+	}
 
-//		for (DoorSegment dSegment : doors) {
-//			if (!dSegment.ccw) { // if CW pocket
-//				System.out.println("Wir sind im CW Pocket");
-//				for (int i = dSegment.reflexVertexIndex % poly.size(); i != dSegment.onEdge.index; i++) {
-//					// winkelcheck
-//					i = i % poly.size();
-//					if (Calculator.calculation_of_angle(poly.get((i - 1 + n) % n).start2,
-//							poly.get(i).start2, poly.get(i).end2) > 180) {
-//						result = findConvexCap(poly.get(i).start2, dSegment, poly, observer);
-//						if (result != null)
-//							caps.add(result);
-//					}
-//
-//				}
-//			} else { // else CCW pocket "analog"
-//				for (int i = dSegment.index%n; i%n != dSegment.onEdge.index%n; i=(i-1+n)%n) {
-//					// winkelcheck
-//					
-//					if (Calculator.calculation_of_angle(poly.get((i - 1 + n) % n).start2,
-//							poly.get(i).start2, poly.get(i).end2) > 180) {
-//
-//						result = findConvexCap(poly.get(i).start2, dSegment, poly, observer);
-//						if (result != null)
-//							caps.add(result);
-//					}
-//				}
-//			}
-//		}
-//		return caps;
+	private static Cap findConcaveCap(Edge e, DoorSegment d, List<Edge> poly, MyPoint observer ) {
+		MyPoint q = null;
+		MyPoint s = null;
+		MyPoint s3 = null;
+		MyPoint s4 = null;
+		Double t;
+		
+		Cap result = null;
+		Double distance_to_u1;
+		
+		// CW door
+		// IMPORTANT NOTE: I use here end2 as u1 and start2 as u2!
+		if (!d.ccw) {
+			Double resT = Double.POSITIVE_INFINITY; // used to find the closest point to u1 = e.end2
+			for (MyPoint vj : d.chain) {
+				// test all reflex vertices in the chain P(r,u2), since we are going CW
+				if (vj.isReflex && vj.index <= e.end2.index) {
+					// s3 has to be type 2b, orientation test o,u2.
+					if (0 > Calculator.cross(observer, e.end2, vj)) {
+						// first we test for s4 to be a tangent.
+						// teste if edge has tangent point for circle, o,s3,u1,u2.
+						
+						// tangentPointDuality is tricky, as a long enough edge can have two tangents.
+						// dividing the edge into two parts, with the dividing point as the intersection of
+						// the edge and the two points forming the line, we yield the correct segment.
+						IntersectionRes a = Calculator.rayIntersectsEdge(observer, vj, e);
+						if(a.intersects) {
+							Edge smallSegment = new Edge(a.intersection,e.end2);
+							s = tangentPointDuality(observer, vj, smallSegment);
+						}
+						else {
+							s = tangentPointDuality(observer, vj, e);
+							
+						}
+						
+	
+						
+						if (s != null) {
+							s.index = e.end2.index;
+							// this test is necessary to stay in bounds. otherwise we can get closer to u1,
+							// with a reflex vertex of type 2b, without keeping the order of first convex
+							// support then concave support
+							if (Calculator.cross(observer, s, vj) < 0) {
+								// find the point that is closest to u1.
+								distance_to_u1 = s.distance(e.start2);
+								if (resT > distance_to_u1) {
+									resT = distance_to_u1;
+									s4 = s;
+									s3 = vj;
+								}
+							}
+						}
+					}
+				}
+			}
+			// if there is no tangent, s4 has to be a reflexVertex!!
+			// test u2
+			if (s3 == null) {
+				resT = Double.POSITIVE_INFINITY; // the t value, to find. the biggest one is the one .
+				// skip the door vertex r, as s3 and s4 can not be on the same edge
+				if (e.end2.isReflex && e.end2 != d.chain.get(0)) {
+					s4 = e.end2;
+					for (MyPoint vj : d.chain) {
+						// test all reflex vertices in the chain P(r,u2), since we are going CW
+						if (vj.isReflex&& vj.index <= e.end2.index) {
+							// s3 has to be type 2b, orientation test o,u2.
+							if (0 > Calculator.cross(observer, e.end2, vj)) {
+								// A type 2b segment has to *cross* the line (observer,s4), so vj is type 2b.
+								if (observer.distance(e.end2) > observer.distance(vj)) {
+								// calculate t Param
+								t = computeT(observer, vj, e.end2);
+								if (t < resT) {
+									resT = t;
+									s3 = vj;
+								}
+							}
+						}
+					}
+				}
+					if(s3 == null) {
+						System.out.println("Doorvertex Colinear with his previous edge, error.");
+						return null;
+					}
+					// calculate q, as we have a concave cap, with s4 = u2.
+					Circle c = Calculator.circumCircle(s3, observer, s4);
+					c.radius = s4.distance(c.center);
+					// THE CONCAVE CAP CONDITION, just like in  convex cap. with angle 90 on both vertices, as smaller means it intersects the
+					// Concave cap, Cap condition for s4
+					double isCap1 = Calculator.calculation_of_angle(c.center,s4,e.start2);
+					double isCap2 = Calculator.calculation_of_angle(poly.get( (s4.index - 1+poly.size()) % poly.size() ).start2, s4, c.center); //
+					// here we test, whether s2 is a real covex support.
+					if ((isCap1 > 90 && isCap1<270) && (isCap2 > 90 && isCap2<270)) { 
+					q = Calculator.CiclePolygonIntersection(poly, c, s3, s4, false, true, d);
+					return new Cap(false,false, s3, s4, q);}
+					else {
+						System.out.println("Cap discarded: s4 is not a concave support.");
+						return null;
+					}
+				}
+				// no tangent point on e, and u2 is no reflex vertex -> no cap
+				else {
+					return null;
+				}
+			}
+			// return tangent point concave cap
+			else {
+				// the calculation of q, is inacurate by 1e-4, the 5th number is wrong, meaning we can get a intersection when there should be none.
+				
+				Circle c = Calculator.circumCircle(s3, observer, s4);
+				c.radius = s4.distance(c.center);
+				q = Calculator.CiclePolygonIntersection(poly, c, s3, s4, false, true, d);
+				// q must be to the left of edge e, to ensure no true intersection between
+				// the Polygon and the arc: observer to s4.
+				// q can also not on the same edge as s4
+				if (Calculator.cross(e.start2, e.end2, q) < 0 )
+					return null;
+				return new Cap(false, false, s3, s4, q);
+			}
+		}
+		
+		
+		
+		// CCW door
+		else {
+			// here u1 is e.start2, u2 is e.end2
+			// test for tangent point
+			Double resT = Double.POSITIVE_INFINITY; 
+			for (MyPoint vj : d.chain) {
+				// test all reflex vertices in the chain P(u2,r), since we are going CCW
+				// vj can be the vertex 0.
+				if(vj.isReflex && (vj.index >= e.end2.index || vj.index == 0)) { 
+					// if vj is type 2b
+					if (Calculator.cross(observer, e.end2, vj) > 0) {
+						// tangentPointDuality is tricky, as a long enough edge can have two tangents.
+						// dividing the edge into two parts, with the dividing point as the intersection of
+						// the edge and the two points forming the line, we yield the correct segment.
+						IntersectionRes a = Calculator.rayIntersectsEdge(observer, vj, e);
+						if(a.intersects) {
+							Edge smallSegment = new Edge(a.intersection,e.end2);
+							s = tangentPointDuality(observer, vj, smallSegment);
+						}
+						else {
+							s = tangentPointDuality(observer, vj, e);
+						}
+						
+
+						if (s != null) {
+							s.index = e.end2.index;
+							// this test is necessary to stay in bounds. otherwise we can get closer to u1,
+							// with a reflex vertex of type 2b, without keeping the order of first convex
+							// support then concave support
+							if (Calculator.cross(observer, s, vj) > 0) {
+								// find the point that is closest to u1.
+								distance_to_u1 = s.distance(e.start2);
+								if (resT > distance_to_u1) {
+									resT = distance_to_u1;
+									s4 = s;
+									s3 = vj;
+								}
+							}
+						}
+					}
+				}
+			}
+			// return Cap with tangent point s4
+			if (s3 != null) {
+				Circle c = Calculator.circumCircle(s3, observer, s4); 
+				c.radius = s4.distance(c.center);
+				q = Calculator.CiclePolygonIntersection(poly, c, s3, s4, false, false, d);
+				// q must be to the right of edge e, to ensure no true intersection between
+				// the Polygon and the arc: observer to s4.
+				// q can also not on the same edge as s4
+				if (Calculator.cross(e.start2, e.end2, q) > 0 || q.index == s4.index)
+					return null;
+				return new Cap(false,true, s3, s4, q);
+			}
+			// test u2
+			else {	
+				resT = Double.NEGATIVE_INFINITY; 
+				// u2, on a concave cap, can only create a concave deficiency if it is reflex vertex, on a concave cap.
+				if(e.end2.isReflex && e.end2 != d.chain.getLast()) { 
+					resT = Double.NEGATIVE_INFINITY; 
+					for (MyPoint vj : d.chain ) {
+						// test all reflex vertices in the chain P(u2,r), since we are going CCW 
+						// vj can be the vertex 0.
+						if (vj.isReflex && (vj.index >= e.end2.index || vj.index == 0)) {
+							if (Calculator.cross(observer, e.end2, vj) > 0) {
+								// A type 2b segment has to *cross* the line (observer,s4), so vj is type 2b.
+								if (observer.distance(e.end2) > observer.distance(vj)) {
+									t = computeT(observer, vj, e.end2);
+									if (t > resT) {
+										resT = t;
+										s3 = vj;
+									}
+								}
+							}
+						}
+					}
+					
+					if(s3 == null) {
+						System.out.println("Doorvertex Colinear with his previous edge, error.");
+						return null;
+					}
+					s4 = e.end2;
+					// test the cap conditions, then calculate q
+					Circle c = Calculator.circumCircle(s3, observer, s4);
+					double isCap1 = Calculator.calculation_of_angle(c.center, e.end2, e.start2);
+					double isCap2 = Calculator.calculation_of_angle(poly.get(e.end2.index).end2, e.end2, c.center); 
+					if ((isCap1 > 90 && isCap1<270) && (isCap2 > 90 && isCap2<270)) {
+						c.radius = s4.distance(c.center); 
+						q = Calculator.CiclePolygonIntersection(poly, c, s3, s4, false, false, d);
+						return new Cap(false, true, s3, s4, q);
+					}
+				}
+					
+				// test the concave support condition.
+
+				// no tangent point on e, and u2 can not be a concave support.
+				else {
+					return null;
+				}
+			}
+			// teste if edge has tangent point for circle, o,s3,u1,u2.
+			// s3 has to be type 2b, orientation test o,u2.
+			// if null, and u2 is not reflex -> null
+			// else return Cap
+		}
+		return null;
 	}
 
 	// input: reflex Vertex s2, a pocket d.
 	// output: Convex Cap or Null
 	public static Cap findConvexCap(MyPoint s2, DoorSegment d, List<Edge> poly, MyPoint observer) {
-		Double resT = Double.NEGATIVE_INFINITY; // the t value, to find. the biggest one is the one .
+		
 		Double t;
 		double orientationStartPoint, orientationEndPoint; // used for cheching weather a point is left or right of a
 															// line
@@ -116,7 +338,6 @@ public class CircularVisibility {
 		int n = poly.size();
 		// finde erstes 3a Segment
 		IntersectionRes first3aSegment = Calculator.findFirst3aSegment(poly, observer, s2);
-		System.out.println("3aSEgment" + first3aSegment.intersection.toString());
 		// Basic Idea
 		// For all type 3a Segments
 		// calculate D
@@ -125,6 +346,7 @@ public class CircularVisibility {
 		// Test for Convex Cap.
 		// calculate q
 		if (!d.ccw) { // check the chain P(r,s2) without s2.
+			Double resT = Double.NEGATIVE_INFINITY; // the t value, to find. the biggest one is the one .
 			for (int i = (s2.index + 1) % n; i != (first3aSegment.vertexNumber + 1) % n; i = (i + 1) % n) {
 				//System.out.println("Edge checking: T values" + poly.get(i).toString());
 				// Test Endpoints of the intersection: why? because D(o,s2,e) can technically
@@ -210,20 +432,21 @@ public class CircularVisibility {
 				if ((isCap1 < 90 || isCap1 > 270) && (isCap2 < 90 || isCap2 > 270)) {
 					// calculate and retur q
 					
-					MyPoint intersection = Calculator.CiclePolygonIntersection(poly, c, s2.index, s1.index, true, true,
+					MyPoint intersection = Calculator.CiclePolygonIntersection(poly, c, s2, s1, true, true,
 							d);
 					if (intersection == null) {
 						System.out.println("Cap discarded: too small to draw, though Mathematicaly exists!");
 						return null;
 					}
-					return new Cap(true, s1, s2, intersection);
-					
+					return new Cap(true, false, s1, s2, intersection);
+
 				} else {
 					System.out.println("Cap discarded: s2 is not a convex support.");
 				}
 			}
 
 		} else {
+			Double resT = Double.POSITIVE_INFINITY; // the t value, to find. the biggest one is the one .
 			// hier CCW pocket
 			// Basic Idea
 			// For all type 3a Segments
@@ -274,9 +497,7 @@ public class CircularVisibility {
 
 
 					if (s1 != null) { // Vergleiche, sonst speichere
-//						System.out.println("");
 						t = computeT(observer, s, s2);
-//						System.out.println("TValue Edge: "+t);
 						if (resT > t) {
 							s1 = s;
 							resT = t;
@@ -285,7 +506,6 @@ public class CircularVisibility {
 
 						resT = computeT(observer, s, s2);
 						s1 = s;
-	//					System.out.println("> T \"first\"Value of: s1 auf Kante WERT: " + resT);
 					}
 				}
 				if (orientationEndPoint > 0) {
@@ -293,7 +513,6 @@ public class CircularVisibility {
 					if (Calculator.cross(observer, s2, s) > 0) { // teste u2, ob Typ 3a
 						if (s1 != null) {
 							t = computeT(observer, s, s2);
-//							System.out.println("t Value u2: "+t);
 							if (resT > t) {
 								s1 = s;
 								resT = t;
@@ -301,7 +520,6 @@ public class CircularVisibility {
 						} else {
 
 							resT = computeT(observer, s, s2);
-//						System.out.println("> T \"first\"Value of: u2 WERT: " + resT);
 							s1 = s;
 						}
 					}
@@ -322,15 +540,14 @@ public class CircularVisibility {
 
 					// calculate and retur q
 					System.out.println("CAP angles: " + isCap1 + " " + isCap2);
-					MyPoint intersection = Calculator.CiclePolygonIntersection(poly, c, s2.index, s1.index, true, false,
-							d);
+					MyPoint intersection = Calculator.CiclePolygonIntersection(poly, c, s2, s1, true, false,d);
 					if (intersection == null) {
 						System.out.println("Cap discarded: too small to draw, though Mathematicaly exists!");
 						return null;
 					}
-					return new Cap(true, s1, s2, intersection);
+					return new Cap(true, true, s1, s2, intersection);
 
-			} else {
+				} else {
 				System.out.println("Cap discarded: s2 is not a convex support.");
 			}
 		
@@ -345,97 +562,7 @@ public class CircularVisibility {
 		return null;
 	}
 
-//		// for each Segment Typ 3a
-//		for (int i = (first3aSegment.onEdge.start2.index) % poly.size(); i % poly.size() != s2.index
-//				% poly.size(); i++) {
-//
-//			// D(o,s2,e)
-//			MyPoint s = computeContactPoint(observer, s2, poly.get(first3aSegment.intersection.index%poly.size()).start2,
-//					poly.get(first3aSegment.intersection.index%poly.size()).end2);
-//
-//			// wenn s1 ein Punkt auf einer Kante ist
-//			if (s != null) { // Punkt auf Kante fuer Concave Support gefunden?
-//
-//				double orientation;
-//				if (d.ccw) { // Die Orientierung fuer 3a Segmenttyp ist umgekehrt fuer CW oder CCW Tasche
-//					orientation = -Calculator.cross(observer, s2, s);
-//				} else {
-//					orientation = Calculator.cross(observer, s2, s);
-//				}
-//				if (orientation < 0) { // teste ob Typ 3a.
-//					System.out.println("punkt der möglich ist gefunden"+ s.toString()); //TODO DEBUG
-//					if (s1 != null) { // Vergleiche, sonst speichere
-//						t = computeTValue(observer, s, s2);
-//						if (resT < t) {
-//							s1 = s;
-//							resT = t;
-//						}
-//					} else {
-//						resT = computeTValue(observer, s, s2);
-//						s1 = s;
-//					}
-//				}
-//			}
-//			// Wenn s1 ein Reflexvertex ist
-//			s = poly.get(first3aSegment.intersection.index).end2; // u2
-//			if (Calculator.cross(observer, s2, s) < 0) { // teste u2, ob Typ 3a
-//				if (s1 != null) {
-//					t = computeTValue(observer, s, s2);
-//					if (resT < t) {
-//						s1 = s;
-//						resT = t;
-//					}
-//				} else {
-//					resT = computeTValue(observer, s, s2);
-//					s1 = s;
-//				}
-//			}
-//		}
 
-//	public static Double computeTValue(MyPoint a, MyPoint b, MyPoint c) {
-//	    // Prüfen ob Punkte gültig sind
-//	    if (a == null || b == null || c == null) return null;
-//
-//	    // Vektoren
-//	    double ax = a.x_coordinate, ay = a.y_coordinate;
-//	    double bx = b.x_coordinate, by = b.y_coordinate;
-//	    double cx = c.x_coordinate, cy = c.y_coordinate;
-//
-//	    // Vektor ac
-//	    double acx = cx - ax;
-//	    double acy = cy - ay;
-//
-//	    // Mitte von ac
-//	    double mx = (ax + cx) / 2.0;
-//	    double my = (ay + cy) / 2.0;
-//
-//	    // {c-a} = CCW-Rotation von (cx-ax, cy-ay) = (-(cy - ay), cx - ax)
-//	    double rx = -acy;
-//	    double ry = acx;
-//
-//	    // Gesuchte Form: C(a b c) = (a+c)/2 + t * {c-a}
-//	    // -> finde t
-//
-//	    // Wir brauchen den Schnittpunkt der Mittelsenkrechten:
-//	    // Skalarprodukte nutzen, um t zu bestimmen
-//	    double d1x = bx - ax;
-//	    double d1y = by - ay;
-//	    double d2x = bx - cx;
-//	    double d2y = by - cy;
-//
-//	    double det = acx * d1y - acy * d1x;
-//	    if (Math.abs(det) < 1e-12) return null; // fast kollinear
-//
-//	    // Formel für t: Löse lineares Gleichungssystem
-//	    // (mx + t*rx - ?) = ...
-//	    double num = ((bx - mx) * d2y - (by - my) * d2x);
-//	    double den = (rx * d2y - ry * d2x);
-//
-//	    if (Math.abs(den) < 1e-12) return null; // degeneriert
-//
-//	    double t = num / den;
-//	    return -t;
-//	}
 
 	public static double computeT(MyPoint a, MyPoint b, MyPoint c) {
 		Circle circle = Calculator.circumCircle(a, b, c);
@@ -755,7 +882,7 @@ public class CircularVisibility {
 			}
 		}
 		if (bestD != null) // Endpunktlösung -> ignorieren
-			if (dist(bestD, e.start2) < 1e-9 || dist(bestD, e.end2) < 1e-9) {
+			if (dist(bestD, e.start2) < 1e-4 || dist(bestD, e.end2) < 1e-4) {
 				return null;
 			}
 		return bestD;

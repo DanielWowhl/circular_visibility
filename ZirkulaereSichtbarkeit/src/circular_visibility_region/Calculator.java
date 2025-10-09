@@ -8,7 +8,7 @@ import drawtool.Edge;
 import drawtool.MyPoint;
 
 public class Calculator {
-	 private static final double EPS = 1e-12;
+	 private static final double EPS = 1e-10; // 1e-12 has error with cicle poly intersection, taking the endpoint as result off by more then eps.
 
 	public static Circle circumCircle(MyPoint a, MyPoint b, MyPoint c) {
 		double d = 2 * (a.x_coordinate * (b.y_coordinate - c.y_coordinate) + b.x_coordinate * (c.y_coordinate - a.y_coordinate) + c.x_coordinate * (a.y_coordinate - b.y_coordinate));
@@ -188,7 +188,7 @@ public class Calculator {
     	    double dy = p1.y_coordinate - p0.y_coordinate;
     	    double segLenSq = dx*dx + dy*dy;
 
-    	    if (segLenSq < 1e-12) {
+    	    if (segLenSq < 1e-10) {
     	        // Degeneriertes Segment: prüfe nur den Punkt
     	        double dist = Math.hypot(p0.x_coordinate - cx, p0.y_coordinate - cy);
     	        if (Math.abs(dist - r) < EPS) intersections.add(p0);
@@ -197,10 +197,10 @@ public class Calculator {
 
     	    // 1. Endpunktprüfung
     	    double dist0 = Math.hypot(p0.x_coordinate - cx, p0.y_coordinate - cy);
-    	    if (Math.abs(dist0 - r) < EPS) intersections.add(p0);
+    	    if (Math.abs(dist0 - r) < EPS) intersections.add(new MyPoint(p0.x_coordinate,p0.y_coordinate));
 
     	    double dist1 = Math.hypot(p1.x_coordinate - cx, p1.y_coordinate - cy);
-    	    if (Math.abs(dist1 - r) < EPS) intersections.add(p1);
+    	    if (Math.abs(dist1 - r) < EPS) intersections.add(new MyPoint(p1.x_coordinate,p1.y_coordinate));
 
     	    // 2. Abstand vom Kreismittelpunkt zur Geraden
     	    // d = |(p1 - p0) x (p0 - C)| / |p1 - p0|
@@ -305,33 +305,46 @@ public class Calculator {
 	}
 	
 	
+	public static List<MyPoint> allCirclePolygonIntersections(List<Edge> poly, Circle circle, MyPoint convexSupport,
+			MyPoint concaveSupport, boolean convexCap, DoorSegment b){
+		List<MyPoint> hits = new ArrayList<>();
+		List<MyPoint> newHits = new ArrayList<>();
+		int steps = b.chain.size() - 1;
+		for (int i = 0; i < steps; i++) { // check the full pocket for intersections
+			newHits = intersectCircleSegment(circle, b.chain.get(i), b.chain.get((i + 1)));
+			if (!newHits.isEmpty()) {
+				for (MyPoint hit : newHits) {
+					hit.index = b.chain.get(i).index;
+					hits.add(hit);
+				}
+			}
+		}
+		return hits;
+	}
+	
+	
     /**
 	 * Liefert den ersten Schnittpunkt zwischen Kreis und Polygon.
-	 * 
-	 * @param poly    CCW-Liste der Kanten
-	 * @param circle  Kreis
-	 * @param index   Startkante
-	 * @param first   Wenn true -> kleineres u zurückgeben, sonst größeres
-	 * @param forward Wenn true -> vorwärts (i+1), sonst rückwärts (i-1)
+	 * redundant code, but it works.
 	 */
-	public static MyPoint CiclePolygonIntersection(List<Edge> poly, Circle circle, int convexSupportIndex,
-			int concaveSupportIndex, boolean convexCap, boolean cw , DoorSegment b) {
+	public static MyPoint CiclePolygonIntersection(List<Edge> poly, Circle circle, MyPoint convexSupport,
+			MyPoint concaveSupport, boolean convexCap, boolean cw , DoorSegment b) {
 		// if convex cap
 		List<MyPoint> hits = new ArrayList<>();
 		List<MyPoint> newHits = new ArrayList<>();
 		int steps;
-		if (convexCap) {
+
 //			if (concaveSupportIndex > convexSupportIndex && concaveSupportIndex < b.chain.getLast().index) {
 //				// I use the linear visibility polygon, as Vertex of Edge 0 is always visible.
 //				// So there can no pocket that starts at a smaller vertex number, then it ends
 //				// Therefore if s1 is inside the pocket, the index has to be in between
-//				steps = concaveSupportIndex - 1; // speed up: check necessary edges
-//			} else {
+//				steps = concaveSupportIndex - 1; // speed up: chain s1,r, if s1 in rr'
+//			} else { // sorry, I left this speed up commented out, as I need to get this project done.
 				steps = b.chain.size() - 1;
 
 //			}
 			for (int i = 0; i < steps; i++) { // check the full pocket for intersections
-				newHits = intersectCircleSegment(circle, b.chain.get(i), b.chain.get((i + 1)%poly.size()));
+				newHits = intersectCircleSegment(circle, b.chain.get(i), b.chain.get((i + 1)));
 				if (!newHits.isEmpty()) {
 					for (MyPoint hit : newHits) {
 						hit.index = b.chain.get(i).index;
@@ -344,33 +357,45 @@ public class Calculator {
 			if (cw) {
 				double currentMin = Double.MAX_VALUE;
 				for (MyPoint hit : hits) {
-					double angle = calculation_of_angle(poly.get(convexSupportIndex).start2, circle.center, hit);
-					if (angle != 0.0 && angle < currentMin) {
+					double angle;
+					if (convexCap) {
+						angle = calculation_of_angle(convexSupport, circle.center, hit);
+					}
+					else {
+						angle = calculation_of_angle(concaveSupport, circle.center, hit);	
+					}
+					if (angle > 0.0001 && angle < currentMin) { // to ensure even small hits are made
+							 // without causing collinear results
 						currentMin = angle;
 						result = hit;
 					}
 				}
 			} else {
-				double currentMin = Double.MIN_VALUE;
+				double currentMin = Double.MAX_VALUE;
 				for (MyPoint hit : hits) {
-					System.out.println("hits: "+ hit.toString());
-					double angle = calculation_of_angle(poly.get(convexSupportIndex).start2, circle.center, hit);
-					if (angle != 0.0 && angle > currentMin) {
-						currentMin = angle;
-						result = hit;
+//					System.out.println("hits: "+ hit.toString());
+					double angle;
+					if (convexCap) {
+						angle = calculation_of_angle(hit, circle.center, convexSupport);
+					} else {
+						angle = calculation_of_angle(hit, circle.center, concaveSupport);
 					}
+					if (angle > 0.0001 && angle < currentMin) { // to ensure even small hits are made
+						 // without causing collinear results
+					currentMin = angle;
+					result = hit;
+				}
 				}
 			}
 			return result;
-		}
+		
 		// start from s2 and check till s1, or full pocket, the smaller one
     	// add all intersections to a list
     	// find the intersection with the smallest angle, angle(c.center,s2,pointfromlist)
     	// return also with index of edge
     	
     	// else concave cap
-		else {
-			return null;
+
 		}
     	
     	
@@ -423,7 +448,7 @@ public class Calculator {
 //        }
 //
 //        return null; // kein Schnittpunkt gefunden
-    }
+    
 
 	// Orientierungstest Gerade a zu b, + wenn c links - wenn c rechts.
     // Scince Computer screens have the y axis inverted, we invert the result, to fit the "computer screen" representation

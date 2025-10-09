@@ -27,6 +27,7 @@ public class PolygonDrawer extends JPanel {
 	private boolean closed = false;
 	private boolean pointPlaced = false;
 	private Point visibilityPoint = null;
+	private MyPoint observer;
 	private fullLinearResult linearRes;
 
 	private static final int CLOSE_DISTANCE = 10;
@@ -61,6 +62,7 @@ public class PolygonDrawer extends JPanel {
 					// Sichtbarkeits-Punkt setzen
 					visibilityPoint = e.getPoint();
 					pointPlaced = true;
+					observer = new MyPoint(visibilityPoint.x, visibilityPoint.y);
 					System.out.println("Sichtbarkeits-Punkt gesetzt bei: " + visibilityPoint);
 				} else {
 					// Prüfen, ob wir einen Vertex ziehen wollen
@@ -114,7 +116,7 @@ public class PolygonDrawer extends JPanel {
 			MyPoint s = CircularVisibility.tangentPointDuality(new MyPoint(points.get(0).x, points.get(0).y),
 					new MyPoint(points.get(1).x, points.get(1).y), new Edge(new MyPoint(points.get(2).x, points.get(2).y), new MyPoint(points.get(3).x, points.get(3).y)));
 		if (s!=null)
-			 createArcThroughPoints(points.get(0),s,points.get(1));
+			 createArcThroughPoints(new MyPoint(points.get(0).x, points.get(0).y),s,new MyPoint(points.get(1).x, points.get(1).y));
 		}
 		else {
 			
@@ -209,8 +211,17 @@ public class PolygonDrawer extends JPanel {
 		MyPoint observer = new MyPoint(visibilityPoint.x, visibilityPoint.y);
 		System.out.println("Sichtbarkeit neu berechnen...");
 		List<Edge> wedges = Calculator.findFirstVisibleVertex(edges, visibilityPoint);
+		int n = wedges.size();
 		wedges = Calculator.calculateVertexAngles(wedges, visibilityPoint);
 		// fill the edges end also with an angle-
+		for (int i = 0; i < wedges.size(); i++) {
+			if(Calculator.calculation_of_angle(wedges.get((i-1+n)%n).start2, wedges.get(i).start2, wedges.get(i).end2)>180) {
+				wedges.get(i).start2.isReflex = true;
+			}
+			else {
+				wedges.get(i).start2.isReflex = false;
+			}
+		}
 		for (int i = 0; i < wedges.size(); i++) {
 			wedges.get(i).start2.index = i;
 			wedges.get(i).end2.index = (i+1)%wedges.size();
@@ -218,16 +229,22 @@ public class PolygonDrawer extends JPanel {
 			wedges.get(i).end = wedges.get((i + 1) % wedges.size()).start;
 		}
 //		printEdges(wedges);
+		
 		linearRes = LinearVisibility.calculateLinearVisibilityPolygon(wedges, visibilityPoint);
 //		printDoors(linearRes.doors);
 		linearVis = linearRes.linearVis;
 		if (linearRes.doors != null)
 			caps = CircularVisibility.calculateCircularVisibility(wedges, observer, linearRes.doors);
-		if (caps != null)
+		if (!caps.isEmpty()) {
+	
 			for (Cap cap : caps) {
-				createArcThroughPoints(visibilityPoint, cap.s1, cap.q);
+				if (cap.isConvex)
+					createArcThroughPoints(observer, cap.s1, cap.q);
+				else
+					createArcThroughPoints(observer, cap.s4, cap.q);
 				System.out.println(cap.toString());
 			}
+		}
 	}
 
 	
@@ -242,8 +259,79 @@ public class PolygonDrawer extends JPanel {
 	
 	
 	
-	
-	
+	// TODO "merge" caps, by deleting all caps that are "inside" of another cap,
+	// meaning: the point s2-q or s4-q are between another cap s2-q or s4-q
+	// respectively.
+	private List<Cap> filterCaps(List<Cap> caps2) {
+		// TODO Auto-generated method stub
+		List<Cap> tempCaps = new ArrayList<>();
+		List<Cap> samePocketCaps = new ArrayList<>();
+		List<Cap> resultCaps = new ArrayList<>();
+		for (int i = 0; i <= caps2.getLast().pocketNr; i++) {
+			// get all caps in same pocket
+			for (Cap c : caps2) {
+				if (c.pocketNr == i) {
+					samePocketCaps.add(c);
+				}
+			}
+			// CCW pocket rules
+			if (samePocketCaps.getFirst().inCCWpocket) {
+				for (Cap c1 : samePocketCaps) {
+					boolean b = true;
+					for (Cap c2 : samePocketCaps) {
+						if (c1.isConvex && !c2.isConvex && (c1 != c2)) {
+							if(c2.s4.index == 0)
+								c2.s4.index = Integer.MAX_VALUE;
+							if (!(c1.s2.index >= c2.q.index) && (c1.q.index <= c2.s4.index)) {
+								b = false;
+							}
+						}
+						// c1 concave
+						else {
+							if (!c1.isConvex && c2.isConvex && (c1 != c2)) {
+								if(c1.s4.index == 0)
+									c1.s4.index = Integer.MAX_VALUE;
+								if(!(c2.s2.index >= c1.q.index)&&(c2.q.index <= c1.s4.index)) {
+									b = false;
+								}
+							}
+							// c1 and c2 are the same cap type
+						}
+					}
+					if(b) {
+						resultCaps.add(c1);
+					}
+				}
+				// CW pocket rules
+			} else {
+				for (Cap c1 : samePocketCaps) {
+					boolean b = true;
+					for (Cap c2 : samePocketCaps) {
+						if (c1.isConvex && !c2.isConvex && (c1 != c2)) {
+							if ((c1.s2.index <= c2.q.index) && (c1.q.index >= c2.s4.index)) {
+								b = false;
+							}
+						}
+						// c1 concave
+						else {
+							if (!c1.isConvex && c2.isConvex && (c1 != c2)) {
+								if((c2.s2.index <= c1.q.index)&&(c2.q.index >= c1.s4.index)) {
+									b = false;
+								}
+							}
+							// c1 and c2 are the same cap type
+						}
+					}
+					if(b) {
+						resultCaps.add(c1);
+					}
+				}
+			}
+		}
+
+		return resultCaps;
+	}
+
 	public void fillPolygonArea(Graphics2D g2d, List<MyPoint> polygonPoints, Color color) {
 		int[] xPoints = polygonPoints.stream().mapToInt(p -> p.x).toArray();
 		int[] yPoints = polygonPoints.stream().mapToInt(p -> p.y).toArray();
@@ -311,18 +399,18 @@ public class PolygonDrawer extends JPanel {
 		repaint();
 	}
 
-	public void createArcThroughPoints(Point2D p1, Point2D p2, Point2D p3) {
+	public void createArcThroughPoints(MyPoint p1, MyPoint p2, MyPoint p3) {
 		try {
-			Point2D center = getCircleCenter(p1, p2, p3);
+			Circle c = Calculator.circumCircle(p1, p2, p3);
 		
-		double radius = center.distance(p1);
+		double radius = c.center.distance(p1);
 
 		double angleStart = normalizeAngle(
-				Math.toDegrees(Math.atan2(p1.getY() - center.getY(), -(p1.getX() - center.getX()))) + 180);
+				Math.toDegrees(Math.atan2(p1.y_coordinate - c.center.y_coordinate, -(p1.x_coordinate - c.center.x_coordinate))) + 180);
 		double angleMid = normalizeAngle(
-				Math.toDegrees(Math.atan2(p2.getY() - center.getY(), -(p2.getX() - center.getX()))) + 180);
+				Math.toDegrees(Math.atan2(p2.y_coordinate - c.center.y_coordinate, -(p2.x_coordinate - c.center.x_coordinate))) + 180);
 		double angleEnd = normalizeAngle(
-				Math.toDegrees(Math.atan2(p3.getY() - center.getY(), -(p3.getX() - center.getX()))) + 180);
+				Math.toDegrees(Math.atan2(p3.y_coordinate - c.center.y_coordinate, -(p3.x_coordinate - c.center.x_coordinate))) + 180);
 
 		angleStart = normalizeAngle(angleStart);
 		angleMid = normalizeAngle(angleMid);
@@ -337,7 +425,7 @@ public class PolygonDrawer extends JPanel {
 		}
 
 		Arc2D.Double arc = new Arc2D.Double();
-		arc.setArcByCenter(center.getX(), center.getY(), radius, angleStart, sweep, Arc2D.OPEN);
+		arc.setArcByCenter(c.center.getX(), c.center.getY(), radius, angleStart, sweep, Arc2D.OPEN);
 
 		arcs.add(arc);
 		repaint();
@@ -415,6 +503,8 @@ public class PolygonDrawer extends JPanel {
 //			 System.out.println("TROLOLOLOLO"+ Calculator.calculation_of_angle(s2, s3, s2));
 //			 
 //		 }
+			 s1.isReflex=false;
+		 System.out.println(s3.isReflex);
 		SwingUtilities.invokeLater(() -> {
 			Graphics2D g2d = (Graphics2D) drawer.getGraphics();
 			Point2D p1 = new Point2D.Double(100, 500); // Start
