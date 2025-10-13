@@ -16,9 +16,18 @@ public class CircularVisibility {
 		int n = poly.size();
 		Cap result;
 		int pocketNr = 0;
+		
+		// fix pocket indices
+		for (DoorSegment dSegment : doors) {
+			if (dSegment.ccw)
+				dSegment.chain.get(0).index = dSegment.chain.get(0).index-1;
+			else
+				dSegment.chain.getLast().index = dSegment.chain.getLast().index+1;
+		}
+		
+		
 		// for each Pocket, find all convex and concave caps
 		for (DoorSegment dSegment : doors) {
-
 			if (!dSegment.ccw) {
 				// CW Pocket
 				// find convex Caps
@@ -94,7 +103,86 @@ public class CircularVisibility {
 			}
 			pocketNr++;
 		}
-		return caps;
+		return merge(caps, n);
+	}
+	public static List<Cap> merge(List<Cap> caps,int n){
+		if(caps.isEmpty())
+			return caps;
+		List<Cap> samePocket = new ArrayList<>();
+		List<Cap> convex = new ArrayList<>();
+		List<Cap> concave = new ArrayList<>();
+		List<Cap> resultCaps = new ArrayList<>();
+		for(int i = 0; i<=caps.getLast().pocketNr;i++) {
+			// get all caps from same pocket
+			for (Cap c : caps) {
+				if (c.pocketNr == i) {
+					samePocket.add(c);
+				}
+			}
+			if (!samePocket.isEmpty()) {
+				for (Cap c : samePocket) {
+					if (c.isConvex) {
+						convex.add(c);
+						// treat vertexNr 0 as biggest
+						if (c.s2.index == 0)
+							c.s2.index = n;
+					} else
+						concave.add(c);
+				}
+				// merge
+				// CCW rules
+				if (samePocket.getFirst().inCCWpocket) {
+					// delete convex caps
+					for (Cap cv : convex) {
+						boolean add = true;
+						for (Cap cc : concave) {
+							if (cc.s4.index < cv.q.index && cc.q.index > cv.s2.index)
+								add = false;
+						}
+						if (add)
+							resultCaps.add(cv);
+					}
+					// delete concave caps
+					for (Cap cc : concave) {
+						boolean add = true;
+						for (Cap cv : convex) {
+							if (cv.s2.index > cc.q.index && cv.q.index <= cc.s4.index)
+								add = false;
+						}
+						if (add)
+							resultCaps.add(cc);
+					}
+				}
+
+				// CW rules
+				else {
+					// delete convex caps
+					for (Cap cv : convex) {
+						boolean add = true;
+						for (Cap cc : concave) {
+							if (cc.s4.index > cv.q.index && cc.q.index < cv.s2.index)
+								add = false;
+						}
+						if (add)
+							resultCaps.add(cv);
+					}
+					// delete concave caps
+					for (Cap cc : concave) {
+						boolean add = true;
+						for (Cap cv : convex) {
+							if (cv.s2.index <= cc.q.index && cv.q.index >= cc.s4.index)
+								add = false;
+						}
+						if (add)
+							resultCaps.add(cc);
+					}
+				}
+				convex.clear();
+				concave.clear();
+				samePocket.clear();
+			}
+		}
+		return resultCaps;
 	}
 
 	private static Cap findConcaveCap(Edge e, DoorSegment d, List<Edge> poly, MyPoint observer ) {
@@ -103,19 +191,45 @@ public class CircularVisibility {
 		MyPoint s3 = null;
 		MyPoint s4 = null;
 		Double t;
-		
+		 
 		Cap result = null;
 		Double distance_to_u1;
+		boolean inside2bSegment = false;
+		MyPoint previousVj = null; 
+		List<MyPoint> type2bVertices = new ArrayList<>();
 		
 		// CW door
 		// IMPORTANT NOTE: I use here end2 as u1 and start2 as u2!
-		if (!d.ccw) {
+		
+		if (!(d.ccw)) {
+			d.chain = d.chain.reversed();
+
+
 			Double resT = Double.POSITIVE_INFINITY; // used to find the closest point to u1 = e.end2
 			for (MyPoint vj : d.chain) {
+				// only take edges that are in the chain r to u2
+				if (vj.index < (e.end2.index)) {
+					// special case for for the first vertex after u2, as the edges share u2.
+					if ((vj.index + 1) == e.end2.index) {
+						// must be left of and must be to the right of Edge e
+						if (Calculator.cross(observer, e.end2, vj) < 0 && Calculator.cross(e.start2, e.end2, vj) > 0) {
+							inside2bSegment = true;
+						}
+					} else {
+					// a type 2b vertex, is, in a CW pocket, left of u2 and has to cross observer-u2, to become type 2b
+					// s3 has to be type 2b
+					// so we have to track the segment type, updating on a linear intersection.
+					IntersectionRes segmentTypeIntersectionVariable = Calculator.rayIntersectsEdge(observer, e.end2,
+							new Edge(previousVj, vj));
+					if (segmentTypeIntersectionVariable.intersects) {
+						if (segmentTypeIntersectionVariable.tParam < 1 && segmentTypeIntersectionVariable.tParam > 0) {
+							inside2bSegment = !inside2bSegment;
+						}
+					}
+				}
 				// test all reflex vertices in the chain P(r,u2), since we are going CW
-				if (vj.isReflex && vj.index <= e.end2.index) {
-					// s3 has to be type 2b, orientation test o,u2.
-					if (0 > Calculator.cross(observer, e.end2, vj)) {
+				if (vj.isReflex && inside2bSegment) {
+					type2bVertices.add(vj);
 						// first we test for s4 to be a tangent.
 						// teste if edge has tangent point for circle, o,s3,u1,u2.
 						
@@ -123,16 +237,13 @@ public class CircularVisibility {
 						// dividing the edge into two parts, with the dividing point as the intersection of
 						// the edge and the two points forming the line, we yield the correct segment.
 						IntersectionRes a = Calculator.rayIntersectsEdge(observer, vj, e);
-						if(a.intersects) {
-							Edge smallSegment = new Edge(a.intersection,e.end2);
+						if (a.intersects) {
+							Edge smallSegment = new Edge(a.intersection, e.end2);
 							s = tangentPointDuality(observer, vj, smallSegment);
-						}
-						else {
+						} else {
 							s = tangentPointDuality(observer, vj, e);
-							
+
 						}
-						
-	
 						
 						if (s != null) {
 							s.index = e.end2.index;
@@ -149,9 +260,13 @@ public class CircularVisibility {
 								}
 							}
 						}
-					}
 				}
-			}
+
+				}
+			previousVj = vj;
+		}
+			d.chain = d.chain.reversed();
+		
 			// if there is no tangent, s4 has to be a reflexVertex!!
 			// test u2
 			if (s3 == null) {
@@ -159,22 +274,18 @@ public class CircularVisibility {
 				// skip the door vertex r, as s3 and s4 can not be on the same edge
 				if (e.end2.isReflex && e.end2 != d.chain.get(0)) {
 					s4 = e.end2;
-					for (MyPoint vj : d.chain) {
-						// test all reflex vertices in the chain P(r,u2), since we are going CW
-						if (vj.isReflex&& vj.index <= e.end2.index) {
-							// s3 has to be type 2b, orientation test o,u2.
-							if (0 > Calculator.cross(observer, e.end2, vj)) {
+					for (MyPoint vj : type2bVertices) {
+
 								// A type 2b segment has to *cross* the line (observer,s4), so vj is type 2b.
-								if (observer.distance(e.end2) > observer.distance(vj)) {
+						
 								// calculate t Param
 								t = computeT(observer, vj, e.end2);
 								if (t < resT) {
 									resT = t;
 									s3 = vj;
 								}
-							}
-						}
-					}
+							
+
 				}
 					if(s3 == null) {
 						System.out.println("Doorvertex Colinear with his previous edge, error.");
@@ -189,7 +300,9 @@ public class CircularVisibility {
 					double isCap2 = Calculator.calculation_of_angle(poly.get( (s4.index - 1+poly.size()) % poly.size() ).start2, s4, c.center); //
 					// here we test, whether s2 is a real covex support.
 					if ((isCap1 > 90 && isCap1<270) && (isCap2 > 90 && isCap2<270)) { 
-					q = Calculator.CiclePolygonIntersection(poly, c, s3, s4, false, true, d);
+					q = Calculator.CiclePolygonIntersection(observer, poly, c, s3, s4, false, true, d);
+					if (q == null)
+						return null;
 					return new Cap(false,false, s3, s4, q);}
 					else {
 						System.out.println("Cap discarded: s4 is not a concave support.");
@@ -207,16 +320,17 @@ public class CircularVisibility {
 				
 				Circle c = Calculator.circumCircle(s3, observer, s4);
 				c.radius = s4.distance(c.center);
-				q = Calculator.CiclePolygonIntersection(poly, c, s3, s4, false, true, d);
+				q = Calculator.CiclePolygonIntersection(observer, poly, c, s3, s4, false, true, d);
 				// q must be to the left of edge e, to ensure no true intersection between
 				// the Polygon and the arc: observer to s4.
 				// q can also not on the same edge as s4
-				if (Calculator.cross(e.start2, e.end2, q) < 0 )
+				if (q == null)
+					return null;
+				if (Calculator.cross(e.start2, e.end2, q) < 0)
 					return null;
 				return new Cap(false, false, s3, s4, q);
 			}
 		}
-		
 		
 		
 		// CCW door
@@ -225,10 +339,32 @@ public class CircularVisibility {
 			// test for tangent point
 			Double resT = Double.POSITIVE_INFINITY; 
 			for (MyPoint vj : d.chain) {
+				// only take edges that are in the chain r to u2
+				if ((vj.index > e.end2.index || vj.index == 0) && e.end2.index != 0 && vj != d.chain.getFirst()) {
+					// special case for for the first vertex after u2, as the edges share u2.
+					if (((vj.index - 1+poly.size())%poly.size()) == e.end2.index) {
+						// must be left of and must be to the right of Edge e
+						if (Calculator.cross(observer, e.end2, vj) > 0 && Calculator.cross(e.start2, e.end2, vj) < 0) {
+							inside2bSegment = true;
+						}
+					} else {
+					// a type 2b vertex, is, in a CW pocket, left of u2 and has to cross observer-u2, to become type 2b
+					// s3 has to be type 2b
+					// so we have to track the segment type, updating on a linear intersection.
+					IntersectionRes segmentTypeIntersectionVariable = Calculator.rayIntersectsEdge(observer, e.end2,
+							new Edge(previousVj, vj));
+					if (segmentTypeIntersectionVariable.intersects) {
+						if (segmentTypeIntersectionVariable.tParam < 1.0 && segmentTypeIntersectionVariable.tParam > 0) {
+							inside2bSegment = !inside2bSegment;
+						}
+					}
+				}
+				
 				// test all reflex vertices in the chain P(u2,r), since we are going CCW
 				// vj can be the vertex 0.
-				if(vj.isReflex && (vj.index >= e.end2.index || vj.index == 0)) { 
+				if(vj.isReflex && inside2bSegment) { 
 					// if vj is type 2b
+					type2bVertices.add(vj);
 					if (Calculator.cross(observer, e.end2, vj) > 0) {
 						// tangentPointDuality is tricky, as a long enough edge can have two tangents.
 						// dividing the edge into two parts, with the dividing point as the intersection of
@@ -244,7 +380,7 @@ public class CircularVisibility {
 						
 
 						if (s != null) {
-							s.index = e.end2.index;
+							s.index = e.start2.index;
 							// this test is necessary to stay in bounds. otherwise we can get closer to u1,
 							// with a reflex vertex of type 2b, without keeping the order of first convex
 							// support then concave support
@@ -261,17 +397,21 @@ public class CircularVisibility {
 					}
 				}
 			}
+			previousVj = vj;
+		}
 			// return Cap with tangent point s4
 			if (s3 != null) {
 				Circle c = Calculator.circumCircle(s3, observer, s4); 
 				c.radius = s4.distance(c.center);
-				q = Calculator.CiclePolygonIntersection(poly, c, s3, s4, false, false, d);
+				q = Calculator.CiclePolygonIntersection(observer, poly, c, s3, s4, false, false, d);
 				// q must be to the right of edge e, to ensure no true intersection between
 				// the Polygon and the arc: observer to s4.
 				// q can also not on the same edge as s4
-				if (Calculator.cross(e.start2, e.end2, q) > 0 || q.index == s4.index)
+				if (q == null)
 					return null;
-				return new Cap(false,true, s3, s4, q);
+				if (Calculator.cross(e.start2, e.end2, q) > 0)
+					return null;
+				return new Cap(false, true, s3, s4, q);
 			}
 			// test u2
 			else {	
@@ -279,25 +419,21 @@ public class CircularVisibility {
 				// u2, on a concave cap, can only create a concave deficiency if it is reflex vertex, on a concave cap.
 				if(e.end2.isReflex && e.end2 != d.chain.getLast()) { 
 					resT = Double.NEGATIVE_INFINITY; 
-					for (MyPoint vj : d.chain ) {
+					for (MyPoint vj : type2bVertices ) {
 						// test all reflex vertices in the chain P(u2,r), since we are going CCW 
-						// vj can be the vertex 0.
-						if (vj.isReflex && (vj.index >= e.end2.index || vj.index == 0)) {
-							if (Calculator.cross(observer, e.end2, vj) > 0) {
-								// A type 2b segment has to *cross* the line (observer,s4), so vj is type 2b.
-								if (observer.distance(e.end2) > observer.distance(vj)) {
+
+								
 									t = computeT(observer, vj, e.end2);
 									if (t > resT) {
 										resT = t;
 										s3 = vj;
 									}
-								}
-							}
-						}
+								
+
 					}
 					
 					if(s3 == null) {
-						System.out.println("Doorvertex Colinear with his previous edge, error.");
+//						System.out.println("Doorvertex Colinear with his previous edge, error. OR as no possible reflexvertex available");
 						return null;
 					}
 					s4 = e.end2;
@@ -307,7 +443,9 @@ public class CircularVisibility {
 					double isCap2 = Calculator.calculation_of_angle(poly.get(e.end2.index).end2, e.end2, c.center); 
 					if ((isCap1 > 90 && isCap1<270) && (isCap2 > 90 && isCap2<270)) {
 						c.radius = s4.distance(c.center); 
-						q = Calculator.CiclePolygonIntersection(poly, c, s3, s4, false, false, d);
+						q = Calculator.CiclePolygonIntersection(observer, poly, c, s3, s4, false, false, d);
+						if (q == null)
+							return null;
 						return new Cap(false, true, s3, s4, q);
 					}
 				}
@@ -345,7 +483,7 @@ public class CircularVisibility {
 		// calculate C of u2, as D will be not an end point
 		// Test for Convex Cap.
 		// calculate q
-		if (!d.ccw) { // check the chain P(r,s2) without s2.
+		if (!(d.ccw)) { // check the chain P(r,s2) without s2.
 			Double resT = Double.NEGATIVE_INFINITY; // the t value, to find. the biggest one is the one .
 			for (int i = (s2.index + 1) % n; i != (first3aSegment.vertexNumber + 1) % n; i = (i + 1) % n) {
 				//System.out.println("Edge checking: T values" + poly.get(i).toString());
@@ -432,7 +570,7 @@ public class CircularVisibility {
 				if ((isCap1 < 90 || isCap1 > 270) && (isCap2 < 90 || isCap2 > 270)) {
 					// calculate and retur q
 					
-					MyPoint intersection = Calculator.CiclePolygonIntersection(poly, c, s2, s1, true, true,
+					MyPoint intersection = Calculator.CiclePolygonIntersection(observer, poly, c, s2, s1, true, true,
 							d);
 					if (intersection == null) {
 						System.out.println("Cap discarded: too small to draw, though Mathematicaly exists!");
@@ -526,8 +664,6 @@ public class CircularVisibility {
 				}
 			}
 		}
-		// TODO kann es auch passieren, dass man prev und next vertrauschen muss, also
-		// 90 und 270, wenn man die CCW oder CW pocket hat?
 
 		if (s1 != null) { // no cap found?!
 			Circle c = Calculator.circumCircle(s1, observer, s2); // center = Kreismittelpunkt o,s1,s2
@@ -539,8 +675,7 @@ public class CircularVisibility {
 			if ((isCap1 < 90 || isCap1 > 270) && (isCap2 < 90 || isCap2 > 270)) {
 
 					// calculate and retur q
-					System.out.println("CAP angles: " + isCap1 + " " + isCap2);
-					MyPoint intersection = Calculator.CiclePolygonIntersection(poly, c, s2, s1, true, false,d);
+					MyPoint intersection = Calculator.CiclePolygonIntersection(observer, poly, c, s2, s1, true, false,d);
 					if (intersection == null) {
 						System.out.println("Cap discarded: too small to draw, though Mathematicaly exists!");
 						return null;
@@ -592,7 +727,7 @@ public class CircularVisibility {
 
 
 
-	// Funktion D gibt den Tangentenpunkt auf der Kante fuer den Krais zuruek
+	// Funktion D using the pq formula.
 	public static MyPoint contactPointD(MyPoint a, MyPoint b, Edge e) {
 		MyPoint e1 = e.start2;
 		MyPoint e2 = e.end2;

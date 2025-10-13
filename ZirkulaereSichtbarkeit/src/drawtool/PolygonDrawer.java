@@ -489,10 +489,12 @@ public class PolygonDrawer extends JPanel {
 		frame.setVisible(true);
 		List<MyPoint> s2points = new ArrayList<>();
 		 Circle circlesss;
-		 MyPoint s1 = new MyPoint(1,1);
-		 MyPoint s2 = new MyPoint(2,0); 
-		 MyPoint s3 = new MyPoint(3,1);
-		 MyPoint s5 = new MyPoint(1440,1032);
+		 MyPoint s1 = new MyPoint(452,338);
+		 MyPoint s2 = new MyPoint(193,193); 
+		 MyPoint s3 = new MyPoint(89,305);
+		 MyPoint s5 = new MyPoint(210,316);
+		 MyPoint tangent = CircularVisibility.tangentPointDuality(s1, s2, new Edge(s3,s5));
+//		 System.out.println(tangent);
 		 circlesss = Calculator.circumCircle(s2, s1, s3);
 		 s2points= Calculator.intersectCircleSegment(circlesss, s2, s5);
 //		 System.out.println("test"+ Calculator.calculation_of_angle(s1, s2, s3));
@@ -504,7 +506,7 @@ public class PolygonDrawer extends JPanel {
 //			 
 //		 }
 			 s1.isReflex=false;
-		 System.out.println(s3.isReflex);
+//		 System.out.println(s3.isReflex);
 		SwingUtilities.invokeLater(() -> {
 			Graphics2D g2d = (Graphics2D) drawer.getGraphics();
 			Point2D p1 = new Point2D.Double(100, 500); // Start

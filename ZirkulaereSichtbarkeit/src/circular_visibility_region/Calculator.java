@@ -327,11 +327,12 @@ public class Calculator {
 	 * Liefert den ersten Schnittpunkt zwischen Kreis und Polygon.
 	 * redundant code, but it works.
 	 */
-	public static MyPoint CiclePolygonIntersection(List<Edge> poly, Circle circle, MyPoint convexSupport,
+	public static MyPoint CiclePolygonIntersection(MyPoint observer, List<Edge> poly, Circle circle, MyPoint convexSupport,
 			MyPoint concaveSupport, boolean convexCap, boolean cw , DoorSegment b) {
 		// if convex cap
 		List<MyPoint> hits = new ArrayList<>();
 		List<MyPoint> newHits = new ArrayList<>();
+		double hitAngle;
 		int steps;
 
 //			if (concaveSupportIndex > convexSupportIndex && concaveSupportIndex < b.chain.getLast().index) {
@@ -352,6 +353,42 @@ public class Calculator {
 					}
 				}
 
+			}
+			if(cw) {
+				if(convexCap) {
+					double concaveAngle = calculation_of_angle(observer, circle.center,concaveSupport );
+					for(MyPoint hit : hits) {
+						hitAngle = calculation_of_angle(observer, circle.center,hit );
+						if( hitAngle != 0.0 && hitAngle+1e-4 < concaveAngle)
+							return null;
+					}
+				}
+				else {
+					double convexAngle = calculation_of_angle(observer, circle.center,convexSupport );
+					for(MyPoint hit : hits) {
+						hitAngle = calculation_of_angle(observer, circle.center,hit );
+						if( hitAngle != 0.0 && hitAngle+1e-4 < convexAngle)
+							return null;
+					}
+				}
+			}
+			else {
+				if(convexCap) {
+					double concaveAngle = calculation_of_angle(concaveSupport, circle.center,observer );
+					for(MyPoint hit : hits) {
+						hitAngle = calculation_of_angle(hit, circle.center,observer );
+						if( hitAngle != 0.0 && hitAngle+1e-4 < concaveAngle)
+							return null;
+					}
+				}
+				else {
+					double convexAngle = calculation_of_angle(convexSupport , circle.center,observer);
+					for(MyPoint hit : hits) {
+						hitAngle = calculation_of_angle(hit , circle.center, observer);
+						if( hitAngle != 0.0 && hitAngle+1e-4 < convexAngle)
+							return null;
+					}
+				}
 			}
 			MyPoint result = null;
 			if (cw) {
