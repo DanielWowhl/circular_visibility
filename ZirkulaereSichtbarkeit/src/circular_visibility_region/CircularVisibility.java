@@ -2,7 +2,6 @@ package circular_visibility_region;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.ListIterator;
 
 import drawtool.Edge;
 import drawtool.MyPoint;
@@ -170,7 +169,7 @@ public class CircularVisibility {
 					for (Cap cc : concave) {
 						boolean add = true;
 						for (Cap cv : convex) {
-							if (cv.s2.index <= cc.q.index && cv.q.index >= cc.s4.index)
+							if (((cv.s2.index)%n) <= cc.q.index && cv.q.index >= cc.s4.index)
 								add = false;
 						}
 						if (add)
@@ -192,7 +191,6 @@ public class CircularVisibility {
 		MyPoint s4 = null;
 		Double t;
 		 
-		Cap result = null;
 		Double distance_to_u1;
 		boolean inside2bSegment = false;
 		MyPoint previousVj = null; 
@@ -301,9 +299,10 @@ public class CircularVisibility {
 					// here we test, whether s2 is a real covex support.
 					if ((isCap1 > 90 && isCap1<270) && (isCap2 > 90 && isCap2<270)) { 
 					q = Calculator.CiclePolygonIntersection(observer, poly, c, s3, s4, false, true, d);
-					if (q == null)
+					if (q == null || q.index == s4.index)
 						return null;
-					return new Cap(false,false, s3, s4, q);}
+					return new Cap(false,false, s3, s4, q);
+					}
 					else {
 						System.out.println("Cap discarded: s4 is not a concave support.");
 						return null;
@@ -324,7 +323,7 @@ public class CircularVisibility {
 				// q must be to the left of edge e, to ensure no true intersection between
 				// the Polygon and the arc: observer to s4.
 				// q can also not on the same edge as s4
-				if (q == null)
+				if (q == null || q.index == s4.index)
 					return null;
 				if (Calculator.cross(e.start2, e.end2, q) < 0)
 					return null;
@@ -407,7 +406,7 @@ public class CircularVisibility {
 				// q must be to the right of edge e, to ensure no true intersection between
 				// the Polygon and the arc: observer to s4.
 				// q can also not on the same edge as s4
-				if (q == null)
+				if (q == null || q.index == s4.index)
 					return null;
 				if (Calculator.cross(e.start2, e.end2, q) > 0)
 					return null;
@@ -442,9 +441,9 @@ public class CircularVisibility {
 					double isCap1 = Calculator.calculation_of_angle(c.center, e.end2, e.start2);
 					double isCap2 = Calculator.calculation_of_angle(poly.get(e.end2.index).end2, e.end2, c.center); 
 					if ((isCap1 > 90 && isCap1<270) && (isCap2 > 90 && isCap2<270)) {
-						c.radius = s4.distance(c.center); 
+						c.radius = s4.distance(c.center);
 						q = Calculator.CiclePolygonIntersection(observer, poly, c, s3, s4, false, false, d);
-						if (q == null)
+						if (q == null || q.index == s4.index)
 							return null;
 						return new Cap(false, true, s3, s4, q);
 					}
@@ -485,6 +484,7 @@ public class CircularVisibility {
 		// calculate q
 		if (!(d.ccw)) { // check the chain P(r,s2) without s2.
 			Double resT = Double.NEGATIVE_INFINITY; // the t value, to find. the biggest one is the one .
+			boolean isType3a = false;
 			for (int i = (s2.index + 1) % n; i != (first3aSegment.vertexNumber + 1) % n; i = (i + 1) % n) {
 				//System.out.println("Edge checking: T values" + poly.get(i).toString());
 				// Test Endpoints of the intersection: why? because D(o,s2,e) can technically
@@ -498,26 +498,35 @@ public class CircularVisibility {
 				orientationStartPoint = Calculator.cross(observer, s2, poly.get(i).start2);
 				orientationEndPoint = Calculator.cross(observer, s2, poly.get(i).end2);
 				if (orientationStartPoint >= 0 && orientationEndPoint >= 0) {
-					// no s1 possible
+					// no s1 possible, as the edge is fully type 2a
 				} else { // here we have to test for concave support s1, as it the edge has a Type 3a
-							// Segment
+							// Segment, IF type3a is true.
 					if (orientationStartPoint <= 0 && orientationEndPoint <= 0) {
+						if(isType3a)
 						s = tangentPointDuality(observer, s2, poly.get(i));
 					} else {
 						if (orientationStartPoint < 0) {
 						// take start2 and onEdge
 							IntersectionRes onEdge = Calculator.rayIntersectsEdge(observer, s2, poly.get(i));
-							if(onEdge.intersection != poly.get(i).start2) // ????
+							if(onEdge.tParam > 1 || i == first3aSegment.vertexNumber)
+								isType3a = true;
+							else
+								isType3a = false;
+							if(onEdge.intersection != poly.get(i).start2 && isType3a) // ????
 								s = tangentPointDuality(observer, s2, new Edge(poly.get(i).start2, new MyPoint(onEdge.intersection.x_coordinate,onEdge.intersection.y_coordinate)));
 						} else {
 						// take end2 and onEdge
 							IntersectionRes onEdge = Calculator.rayIntersectsEdge(observer, s2, poly.get(i));
-							if(onEdge.intersection != poly.get(i).end2)
+							if(onEdge.tParam > 1)
+								isType3a = true;
+							else
+								isType3a = false;
+							if(onEdge.intersection != poly.get(i).end2 && isType3a)
 								s = tangentPointDuality(observer, s2, new Edge(new MyPoint(onEdge.intersection.x_coordinate,onEdge.intersection.y_coordinate), poly.get(i).end2));
 							}
 						}
 					// wenn s1 ein Punkt auf einer Kante ist
-					if (isNotType1a(observer, d, s2, s)) { 
+					if (isType3a && s != null) {
 						s.index = i;
 						if (s1 != null) { // Vergleiche, sonst speichere 
 							t = computeT(observer, s, s2);
@@ -532,7 +541,7 @@ public class CircularVisibility {
 					}
 					if (orientationEndPoint < 0) {
 						s = poly.get(i).end2; // u2
-						if (isNotType1a(observer, d, s2, s) && Calculator.cross(observer, s2, s) < 0) { // teste u2, ob Typ 3a
+						if (isType3a && Calculator.cross(observer, s2, s) < 0) { // teste u2, ob Typ 3a
 							if (s1 != null) {
 								t = computeT(observer, s, s2);
 
@@ -549,9 +558,6 @@ public class CircularVisibility {
 					}
 				}
 			}
-			// TODO kann es auch passieren, dass man prev und next vertrauschen muss, also
-			// 90 und 270, wenn man die CCW oder CW pocket hat?
-
 			if (s1 != null) { // no cap found?!
 				Circle c = Calculator.circumCircle(s1, observer, s2); // center = Kreismittelpunkt o,s1,s2
 				double isCap1 = Calculator.calculation_of_angle(c.center, s2, // Variable fuer
@@ -577,6 +583,7 @@ public class CircularVisibility {
 
 		} else {
 			Double resT = Double.POSITIVE_INFINITY; // the t value, to find. the biggest one is the one .
+			boolean isType1 = false;
 			// hier CCW pocket
 			// Basic Idea
 			// For all type 3a Segments
@@ -604,24 +611,33 @@ public class CircularVisibility {
 				// no s1 possible
 			} else { // here we have to test for concave support s1, as it the edge has a Type 3a
 						// Segment
-				if (orientationStartPoint >= 0 && orientationEndPoint >= 0) {
-					s = tangentPointDuality(observer, s2, poly.get(i));
+				if (orientationStartPoint >= 0 && orientationEndPoint >= 0 ) {
+					if (!(isType1))
+						s = tangentPointDuality(observer, s2, poly.get(i));
 				} else {
 					if (orientationStartPoint > 0) {
 					// take start2 and onEdge
 						IntersectionRes onEdge = Calculator.rayIntersectsEdge(observer, s2, poly.get(i));
-						if(onEdge.intersection != poly.get(i).start2)
+						if((onEdge.tParam < 1 && onEdge.tParam > 0 ))
+							isType1 = true;
+						else
+							isType1 = false;
+						if(onEdge.intersection != poly.get(i).start2 && !(isType1))
 							s = tangentPointDuality(observer, s2, new Edge(poly.get(i).start2, new MyPoint(onEdge.intersection.x_coordinate,onEdge.intersection.y_coordinate)));
 					
 					} else {
 					// take onEdge and end2
 						IntersectionRes onEdge = Calculator.rayIntersectsEdge(observer, s2, poly.get(i));
+						if((onEdge.tParam < 1 && onEdge.tParam > 0 ))
+							isType1 = true;
+						else
+							isType1 = false;
 						if(onEdge.intersection != poly.get(i).end2)
 							s = tangentPointDuality(observer, s2, new Edge(new MyPoint(onEdge.intersection.x_coordinate,onEdge.intersection.y_coordinate), poly.get(i).end2));
 					}
 				}
 		// wenn s1 ein Punkt auf einer Kante ist
-		if (isNotType1a(observer, d, s2, s)) { // Punkt auf Kante fuer Concave Support gefunden?
+		if (s!=null && !(isType1)) { // Punkt auf Kante fuer Concave Support gefunden?
 					s.index = i;
 					// Die Orientierung fuer 3a Segmenttyp ist umgekehrt fuer CW oder CCW Tasche
 
@@ -640,7 +656,7 @@ public class CircularVisibility {
 				}
 				if (orientationEndPoint > 0) {
 					s = poly.get(i).end2; // u2
-					if (isNotType1a(observer, d, s2, s) && Calculator.cross(observer, s2, s) > 0) { // teste u2, ob Typ 3a
+					if (!(isType1) && Calculator.cross(observer, s2, s) > 0) { // teste u2, ob nicht Typ1a aber Typ 3a 
 						if (s1 != null) {
 							t = computeT(observer, s, s2);
 							if (resT > t) {
@@ -668,8 +684,7 @@ public class CircularVisibility {
 
 					// calculate and retur q
 					MyPoint intersection = Calculator.CiclePolygonIntersection(observer, poly, c, s2, s1, true, false,d);
-					if (intersection == null) {
-						System.out.println("Cap discarded: too small to draw, though Mathematicaly exists!");
+					if (intersection == null ) {
 						return null;
 					}
 					return new Cap(true, true, s1, s2, intersection);

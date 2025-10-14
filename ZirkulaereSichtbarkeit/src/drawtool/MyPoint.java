@@ -64,4 +64,9 @@ public class MyPoint extends Point {
         double py = pt.y_coordinate - this.y_coordinate;
         return Math.sqrt(px * px + py * py);
     }
+	public boolean equals(MyPoint pt2) {
+		if (this.x_coordinate == pt2.x_coordinate && this.y_coordinate == pt2.y_coordinate)
+			return true;
+		return false;
+	}
 }
