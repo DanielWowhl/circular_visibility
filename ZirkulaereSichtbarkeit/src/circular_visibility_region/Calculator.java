@@ -8,7 +8,7 @@ import drawtool.Edge;
 import drawtool.MyPoint;
 
 public class Calculator {
-	 private static final double EPS = 1e-10; // 1e-12 has error with cicle poly intersection, taking the endpoint as result off by more then eps.
+	 private static final double EPS = 0; // 1e-12 has error with cicle poly intersection, taking the endpoint as result off by more then eps.
 
 	public static Circle circumCircle(MyPoint a, MyPoint b, MyPoint c) {
 		double d = 2 * (a.x_coordinate * (b.y_coordinate - c.y_coordinate) + b.x_coordinate * (c.y_coordinate - a.y_coordinate) + c.x_coordinate * (a.y_coordinate - b.y_coordinate));
@@ -191,23 +191,16 @@ public class Calculator {
     	    if (segLenSq < 1e-10) {
     	        // Degeneriertes Segment: prüfe nur den Punkt
     	        double dist = Math.hypot(p0.x_coordinate - cx, p0.y_coordinate - cy);
-    	        if (Math.abs(dist - r) < EPS) intersections.add(p0);
+    	        if (Math.abs(dist - r) < 0) intersections.add(p0);
     	        return intersections;
     	    }
-
-    	    // 1. Endpunktprüfung
-    	    double dist0 = Math.hypot(p0.x_coordinate - cx, p0.y_coordinate - cy);
-    	    if (Math.abs(dist0 - r) < EPS) intersections.add(new MyPoint(p0.x_coordinate,p0.y_coordinate));
-
-    	    double dist1 = Math.hypot(p1.x_coordinate - cx, p1.y_coordinate - cy);
-    	    if (Math.abs(dist1 - r) < EPS) intersections.add(new MyPoint(p1.x_coordinate,p1.y_coordinate));
 
     	    // 2. Abstand vom Kreismittelpunkt zur Geraden
     	    // d = |(p1 - p0) x (p0 - C)| / |p1 - p0|
     	    double cross = (dx)*(p0.y_coordinate - cy) - (dy)*(p0.x_coordinate - cx);
     	    double d = Math.abs(cross) / Math.sqrt(segLenSq);
 
-    	    if (d > r + EPS) {
+    	    if (d > r ) {
     	        // Keine Schnittpunkte auf dieser Geraden
     	        return intersections;
     	    }
@@ -234,76 +227,6 @@ public class Calculator {
     	    return intersections;
     	}
 
-	
-	
-	public static List<MyPoint> intersectCircleSegment4(  Circle circle, MyPoint p0, MyPoint p1 ) {
-		double cx = circle.center.x_coordinate; 
-		double cy = circle.center.y_coordinate;
-		double r = circle.radius;
-        double x0 = p0.x_coordinate;
-        double y0 = p0.y_coordinate;
-        double x1 = p1.x_coordinate;
-        double y1 = p1.y_coordinate;
-
-	    List<MyPoint> intersections = new ArrayList<>();
-
-	    double dx = x1 - x0;
-	    double dy = y1 - y0;
-
-	    double fx = x0 - cx;
-	    double fy = y0 - cy;
-
-	    double a = dx * dx + dy * dy;
-	    double b = 2 * (fx * dx + fy * dy);
-	    double c = fx * fx + fy * fy - r * r;
-
-	    double discriminant = b*b - 4*a*c;
-	    
-	    if (Math.abs(c) < EPS) {
-	        // p0 liegt auf Kreis: addiere explizit
-	        intersections.add(p0);
-	        c = 0;
-	    }
-
-	    if (discriminant < 0) {
-	        if (discriminant > -EPS) {
-	            discriminant = 0; // numerischer Fehler
-	        } else {
-	            return intersections; // wirklich kein Schnitt
-	        }
-	    }
-	    
-
-
-		double sqrtDisc = Math.sqrt(discriminant);
-		if (discriminant == 0) {
-			double t = -b / (2 * a);
-			if (t >= -1e-12 && t <= 1 + 1e-12) {
-				intersections.add(new MyPoint(x0 + t * dx, y0 + t * dy));
-			}
-		} else {
-			double q = -0.5 * (b + Math.copySign(sqrtDisc, b));
-			double t1 = q / a;
-			double t2 = c / q;
-
-			// erster Schnittpunkt
-			if (t1 >= -EPS && t1 <= 1 + EPS) {
-				intersections.add(new MyPoint(x0 + t1 * dx, y0 + t1 * dy));
-			}
-			// zweiter Schnittpunkt
-			if (t2 >= 0 && t2 <= 1 && Math.abs(t2 - t1) > 1e-12) {
-				intersections.add(new MyPoint(x0 + t2 * dx, y0 + t2 * dy));
-			}
-		}
-		double dist2s = (p0.x_coordinate - cx) * (p0.x_coordinate - cx)
-				+ (p0.y_coordinate - cy) * (p0.y_coordinate - cy);
-		if (Math.abs(dist2s - r * r) < EPS) {
-			intersections.add(p0);
-		}
-
-		return intersections;
-	}
-	
 	
 	public static List<MyPoint> allCirclePolygonIntersections(List<Edge> poly, Circle circle, MyPoint convexSupport,
 			MyPoint concaveSupport, boolean convexCap, DoorSegment b){

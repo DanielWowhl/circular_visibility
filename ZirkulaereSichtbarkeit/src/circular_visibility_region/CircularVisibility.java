@@ -136,7 +136,7 @@ public class CircularVisibility {
 					for (Cap cv : convex) {
 						boolean add = true;
 						for (Cap cc : concave) {
-							if (cc.s4.index < cv.q.index && cc.q.index > cv.s2.index)
+							if (cc.s4.index < cv.q.index && cc.q.index >= cv.s2.index)
 								add = false;
 						}
 						if (add)
@@ -517,29 +517,22 @@ public class CircularVisibility {
 							}
 						}
 					// wenn s1 ein Punkt auf einer Kante ist
-					if (s != null) { // Punkt auf Kante fuer Concave Support gefunden?
+					if (isNotType1a(observer, d, s2, s)) { 
 						s.index = i;
-						// Die Orientierung fuer 3a Segmenttyp ist umgekehrt fuer CW oder CCW Tasche
-
-
 						if (s1 != null) { // Vergleiche, sonst speichere 
-							//System.out.println("");
 							t = computeT(observer, s, s2);
-						
 							if (resT < t) {
 								s1 = s;
 								resT = t;
 							}
 						} else {
-
 							resT = computeT(observer, s, s2);
 							s1 = s;
-//							System.out.println("> T \"first\"Value of: s1 auf Kante WERT: " + resT);
 						}
 					}
 					if (orientationEndPoint < 0) {
 						s = poly.get(i).end2; // u2
-						if (Calculator.cross(observer, s2, s) < 0) { // teste u2, ob Typ 3a
+						if (isNotType1a(observer, d, s2, s) && Calculator.cross(observer, s2, s) < 0) { // teste u2, ob Typ 3a
 							if (s1 != null) {
 								t = computeT(observer, s, s2);
 
@@ -550,7 +543,6 @@ public class CircularVisibility {
 							} else {
 
 								resT = computeT(observer, s, s2);
-//								System.out.println("> T \"first\"Value of: u2 WERT: " + resT);
 								s1 = s;
 							}
 						}
@@ -629,7 +621,7 @@ public class CircularVisibility {
 					}
 				}
 		// wenn s1 ein Punkt auf einer Kante ist
-				if (s != null) { // Punkt auf Kante fuer Concave Support gefunden?
+		if (isNotType1a(observer, d, s2, s)) { // Punkt auf Kante fuer Concave Support gefunden?
 					s.index = i;
 					// Die Orientierung fuer 3a Segmenttyp ist umgekehrt fuer CW oder CCW Tasche
 
@@ -648,7 +640,7 @@ public class CircularVisibility {
 				}
 				if (orientationEndPoint > 0) {
 					s = poly.get(i).end2; // u2
-					if (Calculator.cross(observer, s2, s) > 0) { // teste u2, ob Typ 3a
+					if (isNotType1a(observer, d, s2, s) && Calculator.cross(observer, s2, s) > 0) { // teste u2, ob Typ 3a
 						if (s1 != null) {
 							t = computeT(observer, s, s2);
 							if (resT > t) {
@@ -697,7 +689,28 @@ public class CircularVisibility {
 		return null;
 	}
 
-
+	
+	public static boolean isNotType1a(MyPoint o, DoorSegment d, MyPoint s2, MyPoint testedVertex) {
+		if (testedVertex == null)
+		return false;
+		if(d.ccw) {
+			// for it to be type 1a in CCW:
+			// testedVertex has to be left of observer-r
+			// testedVertex has to be right of observer-s2. 
+			// inside the circle observer, r, s2.
+			if( Calculator.cross(o, d.reflex, testedVertex) < 0 && Calculator.cross(o, s2, testedVertex) > 0 && o.distance(s2) > o.distance(testedVertex))
+				return false;
+		}
+		else {
+			// for it to be type 1a in CW:
+			// testedVertex has to be right of observer-r
+			// testedVertex has to be left of observer-s2. 
+			// inside the circle observer, r, s2.
+			if( Calculator.cross(o, d.reflex, testedVertex) > 0 && Calculator.cross(o, s2, testedVertex) < 0 && Calculator.cross(d.reflex, s2, testedVertex) > 0)
+				return false;
+		}
+		return true; 
+	}
 
 	public static double computeT(MyPoint a, MyPoint b, MyPoint c) {
 		Circle circle = Calculator.circumCircle(a, b, c);
