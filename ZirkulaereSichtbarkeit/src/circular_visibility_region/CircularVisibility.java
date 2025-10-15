@@ -236,7 +236,13 @@ public class CircularVisibility {
 						// the edge and the two points forming the line, we yield the correct segment.
 						IntersectionRes a = Calculator.rayIntersectsEdge(observer, vj, e);
 						if (a.intersects) {
-							Edge smallSegment = new Edge(a.intersection, e.end2);
+							Edge smallSegment = null;
+							//TODO maybe has to be a > sign!!
+							if (a.tParam > 0) {
+								smallSegment = new Edge(a.intersection, e.end2);
+							} else {
+								smallSegment = new Edge(e.start2, a.intersection);
+							}
 							s = tangentPointDuality(observer, vj, smallSegment);
 						} else {
 							s = tangentPointDuality(observer, vj, e);
@@ -361,22 +367,25 @@ public class CircularVisibility {
 				
 				// test all reflex vertices in the chain P(u2,r), since we are going CCW
 				// vj can be the vertex 0.
-				if(vj.isReflex && inside2bSegment) { 
+				if (vj.isReflex && inside2bSegment) {
 					// if vj is type 2b
 					type2bVertices.add(vj);
-					if (Calculator.cross(observer, e.end2, vj) > 0) {
+
 						// tangentPointDuality is tricky, as a long enough edge can have two tangents.
 						// dividing the edge into two parts, with the dividing point as the intersection of
 						// the edge and the two points forming the line, we yield the correct segment.
 						IntersectionRes a = Calculator.rayIntersectsEdge(observer, vj, e);
-						if(a.intersects) {
-							Edge smallSegment = new Edge(a.intersection,e.end2);
+						if (a.intersects) {
+							Edge smallSegment = null;
+							if (a.tParam > 0) {
+								smallSegment = new Edge(a.intersection, e.end2);
+							} else {
+								smallSegment = new Edge(e.start2, a.intersection);
+							}
 							s = tangentPointDuality(observer, vj, smallSegment);
-						}
-						else {
+						} else {
 							s = tangentPointDuality(observer, vj, e);
 						}
-						
 
 						if (s != null) {
 							s.index = e.start2.index;
@@ -395,12 +404,11 @@ public class CircularVisibility {
 						}
 					}
 				}
+				previousVj = vj;
 			}
-			previousVj = vj;
-		}
 			// return Cap with tangent point s4
 			if (s3 != null) {
-				Circle c = Calculator.circumCircle(s3, observer, s4); 
+				Circle c = Calculator.circumCircle(s3, observer, s4);
 				c.radius = s4.distance(c.center);
 				q = Calculator.CiclePolygonIntersection(observer, poly, c, s3, s4, false, false, d);
 				// q must be to the right of edge e, to ensure no true intersection between
@@ -414,24 +422,21 @@ public class CircularVisibility {
 			}
 			// test u2
 			else {	
-				resT = Double.NEGATIVE_INFINITY; 
+				resT = Double.NEGATIVE_INFINITY;
 				// u2, on a concave cap, can only create a concave deficiency if it is reflex vertex, on a concave cap.
-				if(e.end2.isReflex && e.end2 != d.chain.getLast()) { 
-					resT = Double.NEGATIVE_INFINITY; 
-					for (MyPoint vj : type2bVertices ) {
+				if (e.end2.isReflex && e.end2 != d.chain.getLast()) {
+					resT = Double.NEGATIVE_INFINITY;
+					for (MyPoint vj : type2bVertices) {
 						// test all reflex vertices in the chain P(u2,r), since we are going CCW 
 
-								
-									t = computeT(observer, vj, e.end2);
-									if (t > resT) {
-										resT = t;
-										s3 = vj;
-									}
-								
-
+						t = computeT(observer, vj, e.end2);
+						if (t > resT) {
+							resT = t;
+							s3 = vj;
+						}
 					}
-					
-					if(s3 == null) {
+
+					if (s3 == null) {
 //						System.out.println("Doorvertex Colinear with his previous edge, error. OR as no possible reflexvertex available");
 						return null;
 					}
@@ -508,7 +513,7 @@ public class CircularVisibility {
 						if (orientationStartPoint < 0) {
 						// take start2 and onEdge
 							IntersectionRes onEdge = Calculator.rayIntersectsEdge(observer, s2, poly.get(i));
-							if(onEdge.tParam > 1 || i == first3aSegment.vertexNumber)
+							if(onEdge.tParam > 1 || onEdge.tParam < 0 || i == first3aSegment.vertexNumber)
 								isType3a = true;
 							else
 								isType3a = false;
@@ -517,7 +522,7 @@ public class CircularVisibility {
 						} else {
 						// take end2 and onEdge
 							IntersectionRes onEdge = Calculator.rayIntersectsEdge(observer, s2, poly.get(i));
-							if(onEdge.tParam > 1)
+							if(onEdge.tParam > 1 || onEdge.tParam < 0)
 								isType3a = true;
 							else
 								isType3a = false;
