@@ -21,6 +21,7 @@ A stable Java application that lets you draw a polygon and explore circular visi
 - Observer point placement and movement
 - Real-time circular visibility region visualization
 - Save, remove or turn the Caps into full circles
+#Pro Tip: Press Space to repeat the last action.
 
 ## 💡 Notes
 
