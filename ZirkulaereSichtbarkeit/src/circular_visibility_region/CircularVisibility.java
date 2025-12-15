@@ -102,8 +102,57 @@ public class CircularVisibility {
 			}
 			pocketNr++;
 		}
+		List<Cap> linearCaps = new ArrayList<>();
+		linearCaps = findLinearCaps(poly, doors,observer);
+		for(Cap cap:linearCaps) {
+			caps.add(cap);
+		}
 		return merge(caps, n);
 	}
+	private static List<Cap> findLinearCaps(List<Edge>poly, List<DoorSegment> doors, MyPoint observer) {
+		List<Cap> linCaps = new ArrayList<>();
+		List<MyPoint> reflexVert = new ArrayList<>();
+		for(DoorSegment door :doors) {
+			MyPoint s3, s4;
+			if (door.ccw) {
+				s3 = door.chain.getLast();
+				s4 = door.chain.getFirst();
+			} else {
+				s3 = door.chain.getFirst();
+				s4 = door.chain.getLast();
+			}
+			// if the two pocketvertizes are colinear, that means we have a linear cap.
+			boolean isVertex = false;
+			for (Edge e : poly) {
+				// we need two reflexvertizes to be the lid of the pocket, we know one, now we test the other.
+				if (e.start2.equals(s4) && e.start2.isReflex) {
+					isVertex = true;
+				}
+			}
+			// if endpoints of a pocket are colinear, that means we have a linear cap.
+			if (isVertex) {
+				if (Calculator.cross(observer, s3, s4) < 1e-9) {
+					Double t = Double.POSITIVE_INFINITY;
+					IntersectionRes res = null;
+					// find the first intersection to add as q in linear Cap
+					for (int i = 0; i < door.chain.size() - 1; i++) {
+						IntersectionRes intersection = Calculator.rayIntersectsEdge(observer, s4,
+								new Edge(door.chain.get(i), door.chain.get(i + 1)));
+						if (intersection.intersects) {
+							if (intersection.tParam > 1 && intersection.tParam < t) {
+								t = intersection.tParam;
+								res = intersection;
+							}
+						}
+					}
+					if (res != null)
+						linCaps.add(new Cap(false, door.ccw, s3, s4, res.intersection));
+				}
+			}
+		}
+		return linCaps;
+	}
+
 	public static List<Cap> merge(List<Cap> caps,int n){
 		if(caps.isEmpty())
 			return caps;

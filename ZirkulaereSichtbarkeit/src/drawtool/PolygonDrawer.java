@@ -19,13 +19,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PolygonDrawer extends JPanel {
+	private List<Edge> linearCaps = new ArrayList<>();
 	private final List<Point> points = new ArrayList<>();
 	private final List<Edge> edges = new ArrayList<>();
 	private List<Edge> linearVis = new ArrayList<>();
-	private final List<Arc2D> arcs = new ArrayList<>(); // List of arcs
+	private final List<MyArc2D> arcs = new ArrayList<>(); // List of arcs
 	private List<Cap> caps = new ArrayList<>();
 	private boolean closed = false;
 	private boolean pointPlaced = false;
+	private boolean circles = false;
+	private boolean save = false;
 	private Point visibilityPoint = null;
 	private MyPoint observer;
 	private fullLinearResult linearRes;
@@ -36,8 +39,35 @@ public class PolygonDrawer extends JPanel {
 	// Dragging states
 	private int draggedVertexIndex = -1;
 	private boolean draggingVisibilityPoint = false;
+	public void test() {
+		arcs.clear();
+		linearCaps.clear();
+		repaint();
+	}
+
+	public void cicles() {
+		circles = !circles;
+	}
+
+	public void save() {
+		save = !save;
+	}
 
 	public PolygonDrawer() {
+		setLayout(null); // wir positionieren manuell
+		JButton helloButton = new JButton("Clear arcs");
+		JButton saveCaps= new JButton("Keep arcs");
+		JButton toggleCircles= new JButton("Circles");
+		helloButton.setBounds(10, 30, 95, 30); // Position (x=10, y=10)
+		saveCaps.setBounds(10, 60, 95, 30);
+		toggleCircles.setBounds(10, 90, 90, 30);
+		helloButton.addActionListener(e -> test());
+		saveCaps.addActionListener(e -> save());
+		toggleCircles.addActionListener(e -> cicles());
+		add(helloButton);
+		add(saveCaps);
+		add(toggleCircles);
+		
 		MouseAdapter mouseHandler = new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
@@ -96,7 +126,7 @@ public class PolygonDrawer extends JPanel {
 				draggingVisibilityPoint = false;
 			}
 		};
-
+		
 		addMouseListener(mouseHandler);
 		addMouseMotionListener(mouseHandler);
 	}
@@ -110,17 +140,15 @@ public class PolygonDrawer extends JPanel {
 		for (Point p : points) {
 			g.fillOval(p.x - 3, p.y - 3, 6, 6);
 		}
-		if (points.size() == 4) { // TODO Arc debug
-//			System.out.print(Calculator.calculation_of_angle(edges.get((0) ).start2,edges.get((1) ).start2,
-//					edges.get((2) ).start2));
-			MyPoint s = CircularVisibility.tangentPointDuality(new MyPoint(points.get(0).x, points.get(0).y),
-					new MyPoint(points.get(1).x, points.get(1).y), new Edge(new MyPoint(points.get(2).x, points.get(2).y), new MyPoint(points.get(3).x, points.get(3).y)));
-		if (s!=null)
-			 createArcThroughPoints(new MyPoint(points.get(0).x, points.get(0).y),s,new MyPoint(points.get(1).x, points.get(1).y));
-		}
-		else {
-			
-		}
+//		if (points.size() == 4) { // TODO Arc debug
+////			System.out.print(Calculator.calculation_of_angle(edges.get((0) ).start2,edges.get((1) ).start2,
+////					edges.get((2) ).start2));
+//			MyPoint s = CircularVisibility.tangentPointDuality(new MyPoint(points.get(0).x, points.get(0).y),
+//					new MyPoint(points.get(1).x, points.get(1).y), new Edge(new MyPoint(points.get(2).x, points.get(2).y), new MyPoint(points.get(3).x, points.get(3).y)));
+//		if (s!=null)
+//			 createArcThroughPoints(new MyPoint(points.get(0).x, points.get(0).y),s,new MyPoint(points.get(1).x, points.get(1).y));
+//		}
+
 		// Kanten zeichnen
 		g.setColor(Color.BLUE);
 		for (Edge edge : edges) {
@@ -159,9 +187,24 @@ public class PolygonDrawer extends JPanel {
 			System.out.println(visibilityPoint.toString());
 
 		}
+		if (linearCaps != null) {
+			g.setColor(new Color (148, 0, 255));
+			for (Edge edge : linearCaps) {
+				g.drawLine(edge.start.x, edge.start.y, edge.end.x, edge.end.y);
+			}
+		}
 		if (arcs != null) {
 			g2d.setColor(Color.MAGENTA);
-			for (Arc2D arc : arcs) {
+			for (MyArc2D arc : arcs) {
+				
+				if(arc.isConvex()) {
+					g2d.setColor(Color.MAGENTA);
+				}
+				else {
+					g2d.setColor(new Color (148, 0, 255));
+				}
+				 if(circles)
+					 arc.setAngleExtent(360);
 				g2d.draw(arc);
 			}
 		}
@@ -206,7 +249,10 @@ public class PolygonDrawer extends JPanel {
 	
 	
 	private void recalculateVisibility() {
-		arcs.clear();
+		linearCaps.clear();
+		if (!save) {
+			arcs.clear();
+		}
 		// TODO: Sichtbarkeitsberechnung implementieren
 		MyPoint observer = new MyPoint(visibilityPoint.x, visibilityPoint.y);
 		System.out.println("Sichtbarkeit neu berechnen...");
@@ -239,9 +285,9 @@ public class PolygonDrawer extends JPanel {
 	
 			for (Cap cap : caps) {
 				if (cap.isConvex)
-					createArcThroughPoints(observer, cap.s1, cap.q);
+					createArcThroughPoints(observer, cap.s1, cap.q,true);
 				else
-					createArcThroughPoints(observer, cap.s4, cap.q);
+					createArcThroughPoints(observer, cap.s4, cap.q,false);
 				System.out.println(cap.toString());
 			}
 		}
@@ -392,15 +438,20 @@ public class PolygonDrawer extends JPanel {
 		}
 
 		// Step 4: Create arc using center-based method
-		Arc2D.Double arc = new Arc2D.Double();
+		MyArc2D.Double arc = new MyArc2D.Double();
 		arc.setArcByCenter(center.getX(), center.getY(), radius, angleStart, sweep, Arc2D.OPEN);
 
-		arcs.add(arc);
+		arcs.add((MyArc2D) arc);
 		repaint();
 	}
 
-	public void createArcThroughPoints(MyPoint p1, MyPoint p2, MyPoint p3) {
+	public void createArcThroughPoints(MyPoint p1, MyPoint p2, MyPoint p3, boolean b) {
 		try {
+			double d = 2 * (p1.x_coordinate * (p2.y_coordinate - p3.y_coordinate) + p2.x_coordinate * (p3.y_coordinate - p1.y_coordinate) + p3.x_coordinate * (p1.y_coordinate - p2.y_coordinate));
+			if (Math.abs(d) < 1e-9) {
+				linearCaps.add(new Edge(p1,p3));
+				throw new IllegalArgumentException("Kollinear!");
+				}
 			Circle c = Calculator.circumCircle(p1, p2, p3);
 		
 		double radius = c.center.distance(p1);
@@ -424,10 +475,14 @@ public class PolygonDrawer extends JPanel {
 			sweep -= 360; // go clockwise
 		}
 
-		Arc2D.Double arc = new Arc2D.Double();
+		MyArc2D arc = new MyArc2D();
 		arc.setArcByCenter(c.center.getX(), c.center.getY(), radius, angleStart, sweep, Arc2D.OPEN);
 
-		arcs.add(arc);
+		arcs.add((MyArc2D) arc);
+		if(b)
+			arc.setIsConvex(true);
+		else
+			arc.setIsConvex(false);
 		repaint();
 		} finally {
 			

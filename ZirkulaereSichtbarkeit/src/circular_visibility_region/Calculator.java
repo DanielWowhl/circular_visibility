@@ -10,6 +10,9 @@ import drawtool.MyPoint;
 public class Calculator {
 	 private static final double EPS = 0; // 1e-12 has error with cicle poly intersection, taking the endpoint as result off by more then eps.
 
+	 
+	 
+	 
 	public static Circle circumCircle(MyPoint a, MyPoint b, MyPoint c) {
 		double d = 2 * (a.x_coordinate * (b.y_coordinate - c.y_coordinate) + b.x_coordinate * (c.y_coordinate - a.y_coordinate) + c.x_coordinate * (a.y_coordinate - b.y_coordinate));
 		if (Math.abs(d) < 1e-9)

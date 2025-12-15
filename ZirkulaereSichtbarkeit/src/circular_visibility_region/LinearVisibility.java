@@ -98,7 +98,7 @@ public class LinearVisibility {
 						// System.out.println(poly.get((i)%n).start2+"is "+ Calculator.isVertexVisible(poly, observer, poly.get((i)%n).start2));
 						i++;
 						error++;
-						if (error == n) {
+						if (error == n+1) {
 							throw new IllegalArgumentException("Point not in Polygon!");
 						}
 					}
