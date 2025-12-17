@@ -1,4 +1,4 @@
-# 🧭 Polygon Visibility Visualizer
+# 🧭 Polygon Visibility Visualizer V1.0
 
 A stable Java application that lets you draw a polygon and explore circular visibility from a user-defined point.
 
@@ -20,17 +20,16 @@ A stable Java application that lets you draw a polygon and explore circular visi
 - Drag-and-drop editing of vertices
 - Observer point placement and movement
 - Real-time circular visibility region visualization
+- Save, remove or turn the Caps into full circles
+#Pro Tip: Press Space to repeat the last action.
 
 ## 💡 Notes
 
 - Ensure the polygon is **simple** (no self-intersections).
 - The visibility region updates automatically when you move the observer or edit the shape.
+- linear Caps will be straigt lines
 
 ## 🛠️ Technologies
 
 - Java (Swing / AWT)
 
-  **NOTE** the project is not yet finished.
-  TODOs:
-  > Add find Concave Cap method for CW and CCW arcs
-  > Add a merge for concave and convex cap to have the correct circular visibility
