@@ -168,12 +168,6 @@ public class LinearVisibility {
 		return linearVis;
 	}
 
-	private static void printDoors(List<DoorSegment> doors) {
-		for (DoorSegment d : doors) {
-			System.out.println(d.toString());
-		}
-
-	}
 
 	private static List<Edge> calculateLinearPoly(List<MyPoint> linearVis) {
 		List<Edge> linearVisPoly = new ArrayList<>();
@@ -200,7 +194,7 @@ public class LinearVisibility {
 		// if diff > 0 and < 180, then B is after A in CCW direction
 		return diff > 0 && diff < 180;
 	}
-
+	// implemented with help of ChatGPT
 	public static IntersectionRes rayIntersectsEdge(Point observer, Point testVert, Edge edge) {
 		double dxRay = testVert.x - observer.x;
 		double dyRay = testVert.y - observer.y;

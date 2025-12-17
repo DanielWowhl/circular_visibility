@@ -50,7 +50,7 @@ public class Calculator {
 
 		return edges;
 	}
-
+	// implemented with help of ChatGPT
 	public static IntersectionRes rayIntersectsEdge(Point observer, MyPoint testVert, Edge edge) {
 		double dxRay = testVert.x_coordinate - observer.x;
 		double dyRay = testVert.y_coordinate - observer.y;
@@ -130,7 +130,7 @@ public class Calculator {
 		return null;
 		// nothing found, pls help! no edge visible!
 	}
-
+	// implemented with help of ChatGPT
 	public static double calculation_of_angle(MyPoint p1, MyPoint p2, MyPoint p3) {
 		// Vektoren
 		double v1x = p1.x_coordinate - p2.x_coordinate;
@@ -177,7 +177,7 @@ public class Calculator {
 	}
 	
 	
-
+	// implemented with help of ChatGPT
     public static List<MyPoint> intersectCircleSegment(Circle circle, MyPoint p0, MyPoint p1) {
 
     	    List<MyPoint> intersections = new ArrayList<>();
@@ -328,7 +328,7 @@ public class Calculator {
 						angle = calculation_of_angle(concaveSupport, circle.center, hit);	
 					}
 					if (angle > 0.0001 && angle < currentMin) { // to ensure even small hits are made
-							 // without causing collinear results
+							 // without causing colinear results
 						currentMin = angle;
 						result = hit;
 					}
@@ -351,68 +351,9 @@ public class Calculator {
 				}
 			}
 			return result;
-		
-		// start from s2 and check till s1, or full pocket, the smaller one
-    	// add all intersections to a list
-    	// find the intersection with the smallest angle, angle(c.center,s2,pointfromlist)
-    	// return also with index of edge
-    	
-    	// else concave cap
-
-		}
-    	
-    	
-    	
-    	
-    	
-    	
-//    	
-//        int n = poly.size();
-//        int i = (index)%n;
-//
-//        for (int steps = 0; steps < n; steps++) {
-//            Edge e = poly.get(i);
-//            List<MyPoint> hits =
-//            		intersectCircleSegment(circle, e.end2, e.start2);
-//
-//			if (!hits.isEmpty()) {
-//				if (hits.size() > 1) {
-//
-//					System.out.print("mehr als eine Lösung auf Kante!");
-//					for (MyPoint s : hits)
-//						System.out.println("Lös: " + s.toString());
-//				}
-//				if (hits.size() == 1) {
-//
-//					System.out.print(" eine Lösung auf Kante!");
-//					for (MyPoint s : hits)
-//						System.out.println("Lös: " + s.toString());
-//				}
-//				// sortiere nach u (0..1)
-//
-//				if (first) {
-//					hits.get(0).index = i;
-//					return hits.get(0); // größter u
-//				} else {
-//					hits.get(hits.size() - 1).index = i;
-//                    return hits.get(hits.size() - 1); // größter u
-//                }
-//            }
-//            else {
-//            	System.out.println("SP: Kante"+e.toString()+" keinen SP.");
-//            }
-//
-//            // zum nächsten Index
-//            if (forward) {
-//                i = (i + 1) % n;
-//            } else {
-//                i = (i - 1 + n) % n;
-//            }
-//        }
-//
-//        return null; // kein Schnittpunkt gefunden
-    
-
+	}
+	
+	// implemented with help of ChatGPT
 	// Orientierungstest Gerade a zu b, + wenn c links - wenn c rechts.
     // Scince Computer screens have the y axis inverted, we invert the result, to fit the "computer screen" representation
 	public static double cross(MyPoint a, MyPoint b, MyPoint c) {

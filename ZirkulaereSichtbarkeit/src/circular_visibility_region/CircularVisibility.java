@@ -10,7 +10,10 @@ public class CircularVisibility {
 
 	//
 	public static List<Cap> calculateCircularVisibility(List<Edge> poly, MyPoint observer, List<DoorSegment> doors) {
-
+		/** The Idea of calculation the circular visibility region,
+		 *  by finding the caps is based on the idea of Mikkel Abrahamsen.
+		 *   https://hjemmesider.diku.dk/~jyrki/PE-lab/Mikkel/thesis.pdf 
+		 */
 		List<Cap> caps = new ArrayList<>();
 		int n = poly.size();
 		Cap result;
@@ -111,7 +114,6 @@ public class CircularVisibility {
 	}
 	private static List<Cap> findLinearCaps(List<Edge>poly, List<DoorSegment> doors, MyPoint observer) {
 		List<Cap> linCaps = new ArrayList<>();
-		List<MyPoint> reflexVert = new ArrayList<>();
 		for(DoorSegment door :doors) {
 			MyPoint s3, s4;
 			if (door.ccw) {
@@ -286,7 +288,7 @@ public class CircularVisibility {
 						IntersectionRes a = Calculator.rayIntersectsEdge(observer, vj, e);
 						if (a.intersects) {
 							Edge smallSegment = null;
-							//TODO maybe has to be a > sign!!
+						
 							if (a.tParam > 0) {
 								smallSegment = new Edge(a.intersection, e.end2);
 							} else {
@@ -780,274 +782,43 @@ public class CircularVisibility {
 		}
 		return true; 
 	}
-
+	
 	public static double computeT(MyPoint a, MyPoint b, MyPoint c) {
 		Circle circle = Calculator.circumCircle(a, b, c);
 		MyPoint center = circle.center;
-		// Mittelpunkt der Sehne AC
+
 		double mx = (a.x_coordinate + c.x_coordinate) / 2.0;
 		double my = (a.y_coordinate + c.y_coordinate) / 2.0;
 
-		// Richtungsvektor v = (c - a) rotiert um 90° CCW
 		double vx = -(c.y_coordinate - a.y_coordinate);
 		double vy = (c.x_coordinate - a.x_coordinate);
 
-		// Differenz von M zum bekannten Mittelpunkt
 		double dx = center.x_coordinate - mx;
 		double dy = center.y_coordinate - my;
 
-		// t = (d·v) / (v·v)
 		double dotDV = dx * vx + dy * vy;
 		double dotVV = vx * vx + vy * vy;
 
 		if (dotVV == 0) {
-			throw new IllegalArgumentException("A und C dürfen nicht identisch sein!");
+			throw new IllegalArgumentException("division by zero!");
 		}
 
 		return dotDV / dotVV;
 	}
-
-
-
-	// Funktion D using the pq formula.
-	public static MyPoint contactPointD(MyPoint a, MyPoint b, Edge e) {
-		MyPoint e1 = e.start2;
-		MyPoint e2 = e.end2;
-
-		// Vektor ab und e
-		double abx = b.x_coordinate - a.x_coordinate;
-		double aby = b.y_coordinate - a.y_coordinate;
-		double ex = e2.x_coordinate - e1.x_coordinate;
-		double ey = e2.y_coordinate - e1.y_coordinate;
-
-		// Parallelität prüfen (determinante nahe 0)
-		double det = abx * ey - aby * ex;
-		if (Math.abs(det) < 1e-9) {
-			return null; // ab || e
-		}
-
-		// X = Mittelpunkt von ab
-		MyPoint X = new MyPoint((a.x_coordinate + b.x_coordinate) / 2.0, (a.y_coordinate + b.y_coordinate) / 2.0);
-
-		// Z = Schnittpunkt von ab und e
-		MyPoint Z = lineIntersection(a, b, e1, e2);
-		if (Z == null)
-			return null;
-
-		// Y = Schnittpunkt: Mittelsenkrechte von ab und Linie e
-		// Richtung der Mittelsenkrechten = (-aby, abx)
-		MyPoint perpDir = new MyPoint(-aby, abx);
-		MyPoint Y = lineIntersection(X, new MyPoint(X.x_coordinate + perpDir.x_coordinate, X.y_coordinate + perpDir.y_coordinate), e1, e2);
-		if (Y == null)
-			return null;
-
-		// Längen
-		double XZ = dist(X, Z);
-		double YZ = dist(Y, Z);
-		double XY = dist(X, Y);
-
-		// Quadratische Gleichung für h
-		// r = ( (XY - h) * XZ ) / YZ
-		// r^2 = h^2 + |aX|^2
-		double aX = dist(a, X);
-
-		// => ( (XY - h) * XZ / YZ )^2 = h^2 + aX^2
-		double alpha = (XZ * XZ) / (YZ * YZ);
-		// => (XY - h)^2 * alpha = h^2 + aX^2
-		// => alpha*(h^2 - 2*XY*h + XY^2) = h^2 + aX^2
-		// => (alpha - 1)h^2 - 2*alpha*XY*h + (alpha*XY^2 - aX^2) = 0
-
-		double A = alpha - 1.0;
-		double B = -2.0 * alpha * XY;
-		double C = alpha * XY * XY - aX * aX;
-
-		double disc = B * B - 4 * A * C;
-		if (disc < 0)
-			return null;
-
-		// Zwei mögliche Lösungen für h
-		double sqrtDisc = Math.sqrt(disc);
-		double h1 = (-B + sqrtDisc) / (2 * A);
-		double h2 = (-B - sqrtDisc) / (2 * A);
-
-		// Teste beide Lösungen
-		MyPoint bestD = null;
-		double bestErr = Double.POSITIVE_INFINITY;
-
-		double[] hs = { h1, h2 };
-		for (double h : hs) {
-			// Mittelpunkt C auf der Mittelsenkrechten
-			double norm = Math.sqrt(perpDir.x_coordinate * perpDir.x_coordinate + perpDir.y_coordinate * perpDir.y_coordinate);
-			double Cx = X.x_coordinate + (h / norm) * perpDir.x_coordinate;
-			double Cy = X.y_coordinate + (h / norm) * perpDir.y_coordinate;
-
-			double r = dist(new MyPoint(Cx, Cy), a);
-
-			// Projektion auf Kante e, Fußpunkt D
-			MyPoint D = footOfPerpendicular(new MyPoint(Cx, Cy), e1, e2);
-
-			if (D != null && onSegment(D, e1, e2)) {
-				// Berechne Abweichung zum Radius
-				double err = Math.abs(dist(D, new MyPoint(Cx, Cy)) - r);
-				if (err < bestErr) {
-					bestErr = err;
-					bestD = D;
-				}
-			}
-		}
-
-		// Rückgabe der besten Lösung
-		return bestD;
-	}
-
-	// ---- Hilfsfunktionen ----
 
 	private static double dist(MyPoint p1, MyPoint p2) {
 		double dx = p1.x_coordinate - p2.x_coordinate;
 		double dy = p1.y_coordinate - p2.y_coordinate;
 		return Math.sqrt(dx * dx + dy * dy);
 	}
-
-	private static MyPoint lineIntersection(MyPoint p1, MyPoint p2, MyPoint p3, MyPoint p4) {
-		double A1 = p2.y_coordinate - p1.y_coordinate;
-		double B1 = p1.x_coordinate - p2.x_coordinate;
-		double C1 = A1 * p1.x_coordinate + B1 * p1.y_coordinate;
-
-		double A2 = p4.y_coordinate - p3.y_coordinate;
-		double B2 = p3.x_coordinate - p4.x_coordinate;
-		double C2 = A2 * p3.x_coordinate + B2 * p3.y_coordinate;
-
-		double det = A1 * B2 - A2 * B1;
-		if (Math.abs(det) < 1e-9)
-			return null;
-
-		double x = (B2 * C1 - B1 * C2) / det;
-		double y = (A1 * C2 - A2 * C1) / det;
-		return new MyPoint(x, y);
-	}
-
-	private static MyPoint footOfPerpendicular(MyPoint p, MyPoint a, MyPoint b) {
-		double dx = b.x_coordinate - a.x_coordinate;
-		double dy = b.y_coordinate - a.y_coordinate;
-		double t = ((p.x_coordinate - a.x_coordinate) * dx + (p.y_coordinate - a.y_coordinate) * dy) / (dx * dx + dy * dy);
-		return new MyPoint(a.x_coordinate + t * dx, a.y_coordinate + t * dy);
-	}
-
-	private static boolean onSegment(MyPoint p, MyPoint a, MyPoint b) {
-		return p.x_coordinate >= Math.min(a.x_coordinate, b.x_coordinate) - 1e-9 && p.x_coordinate <= Math.max(a.x_coordinate, b.x_coordinate) + 1e-9 && p.y_coordinate >= Math.min(a.y_coordinate, b.y_coordinate) - 1e-9
-				&& p.y_coordinate <= Math.max(a.y_coordinate, b.y_coordinate) + 1e-9;
-	}
-
-	public static MyPoint computeContactPoint2(MyPoint a, MyPoint b, Edge e) {
-		// Schritt 1: Vektoren vorbereiten
-		MyPoint e1 = e.start2, e2 = e.end2;
-		double ax = a.x_coordinate, ay = a.y_coordinate;
-		double bx = b.x_coordinate, by = b.y_coordinate;
-		double e1x = e1.x_coordinate, e1y = e1.y_coordinate;
-		double e2x = e2.x_coordinate, e2y = e2.y_coordinate;
-
-		// Mitte von AB
-		double Xx = (ax + bx) / 2.0;
-		double Xy = (ay + by) / 2.0;
-
-		// Richtung von AB
-		double vx = bx - ax;
-		double vy = by - ay;
-
-		// Senkrechte Richtung (CCW gedreht)
-		double perpX = -vy;
-		double perpY = vx;
-
-		// Linie durch e1-e2
-		double ux = e2x - e1x;
-		double uy = e2y - e1y;
-
-		// Schritt 2: Schnitt Y = Schnittpunkt der Senkrechten von X mit e-Linie
-		double denom = perpX * (-uy) + perpY * ux;
-		if (Math.abs(denom) < 1e-9) {
-			return null; // ab || e → kein eindeutiger Kreis
-		}
-		double t = ((e1x - Xx) * (-uy) + (e1y - Xy) * ux) / denom;
-		double Yx = Xx + t * perpX;
-		double Yy = Xy + t * perpY;
-
-		// Schritt 3: Schnitt Z = Schnittpunkt der Linien ab und e
-		double denomZ = vx * (-uy) + vy * ux;
-		if (Math.abs(denomZ) < 1e-9) {
-			return null; // ab || e → kein Schnitt
-		}
-		double tz = ((e1x - ax) * (-uy) + (e1y - ay) * ux) / denomZ;
-		double Zx = ax + tz * vx;
-		double Zy = ay + tz * vy;
-
-		// Schritt 4: Längen berechnen
-		double XY = Math.hypot(Xx - Yx, Xy - Yy);
-		double XZ = Math.hypot(Xx - Zx, Xy - Zy);
-		double YZ = Math.hypot(Yx - Zx, Yy - Zy);
-
-		// Quadratische Gleichung: r² = h² + |aX|², r = (XY - h) * XZ / YZ
-		double aX = Math.hypot(ax - Xx, ay - Xy);
-
-		// h ist unbekannt → setze r(h) ein
-		// r = (XY - h) * XZ / YZ
-		// r² = h² + aX²
-		double alpha = (XZ / YZ) * (XZ / YZ);
-		double A = 1 - alpha;
-		double B = 2 * XY * alpha;
-		double C = (alpha * XY * XY) - (aX * aX);
-
-		double disc = B * B - 4 * A * C;
-		if (disc < 0) {
-			return null; // keine Lösung
-		}
-
-		// zwei Lösungen für h
-		double sqrtDisc = Math.sqrt(disc);
-		double h1 = (-B + sqrtDisc) / (2 * A);
-		double h2 = (-B - sqrtDisc) / (2 * A);
-
-		// Schritt 5: wähle h → bestimme C = X + h * (perp/|perp|)
-		double perpLen = Math.hypot(perpX, perpY);
-		double nx = perpX / perpLen;
-		double ny = perpY / perpLen;
-
-		double[] hs = { h1, h2 };
-		for (double h : hs) {
-			double Cx = Xx + h * nx;
-			double Cy = Xy + h * ny;
-
-			// Radius
-			double r = Math.hypot(Cx - ax, Cy - ay);
-
-			// D liegt auf e und Abstand zu C ist r
-			// param. e = e1 + s*(e2-e1)
-			double ex = ux, ey = uy;
-			double fx = e1x - Cx, fy = e1y - Cy;
-
-			double Aeq = ex * ex + ey * ey;
-			double Beq = 2 * (fx * ex + fy * ey);
-			double Ceq = fx * fx + fy * fy - r * r;
-
-			double disc2 = Beq * Beq - 4 * Aeq * Ceq;
-			if (disc2 < 0)
-				continue;
-
-			double sqrtDisc2 = Math.sqrt(disc2);
-			double s1 = (-Beq + sqrtDisc2) / (2 * Aeq);
-			double s2 = (-Beq - sqrtDisc2) / (2 * Aeq);
-
-			for (double s : new double[] { s1, s2 }) {
-				if (s > 1e-9 && s < 1 - 1e-9) { // D strikt innerhalb (e1,e2)
-					double Dx = e1x + s * ex;
-					double Dy = e1y + s * ey;
-					return new MyPoint(Dx, Dy);
-				}
-			}
-		}
-
-		return null; // kein gültiger D gefunden
-	}
-
+	
+	/**This method for finding a Cicle-tangent was implemented by ChatGPT from OpenAI, 2025.
+	 * The implementation is based on inversion geometry.
+	 * A Novel Method for Drawing a Circle Tangent to Three Circles Lying on a Plane by Straightedge, Compass, and Inversion Circles
+	 * Author: Ahmad Sabihi
+	 * Published: May 31, 2019
+	 * Link: arXiv:1906.00068
+	 */
 	public static MyPoint tangentPointDuality(MyPoint a, MyPoint b, Edge e) {
 		if (a == null || b == null || e == null)
 			return null;
@@ -1161,46 +932,4 @@ public class CircularVisibility {
 		return res;
 	}
 
-	public static List<CircleSegmentIntersection> intersectCircleSegment(double cx, double cy, double r, double x0,
-			double y0, double x1, double y1) {
-
-		List<CircleSegmentIntersection> intersections = new ArrayList<>();
-
-		double dx = x1 - x0;
-		double dy = y1 - y0;
-
-		// Quadratische Gleichung: (P0 + t*d - C)^2 = r^2
-		double fx = x0 - cx;
-		double fy = y0 - cy;
-
-		double a = dx * dx + dy * dy;
-		double b = 2 * (fx * dx + fy * dy);
-		double c = fx * fx + fy * fy - r * r;
-
-		double discriminant = b * b - 4 * a * c;
-
-		if (discriminant < 0) {
-			// Keine Loesung -> keine Schnittpunkte
-			return intersections;
-		}
-
-		discriminant = Math.sqrt(discriminant);
-
-		double t1 = (-b - discriminant) / (2 * a);
-		double t2 = (-b + discriminant) / (2 * a);
-
-		// Pruefen ob die Loesungen im Segment liegen: 0 <= t <= 1
-		if (t1 >= 0 && t1 <= 1) {
-			double ix1 = x0 + t1 * dx;
-			double iy1 = y0 + t1 * dy;
-			intersections.add(new CircleSegmentIntersection(new MyPoint(ix1, iy1), t1));
-		}
-		if (t2 >= 0 && t2 <= 1 && discriminant > 1e-12) { // zweiter Punkt, wenn nicht identisch
-			double ix2 = x0 + t2 * dx;
-			double iy2 = y0 + t2 * dy;
-			intersections.add(new CircleSegmentIntersection(new MyPoint(ix2, iy2), t2));
-		}
-
-		return intersections;
-	}
 }

@@ -55,29 +55,6 @@ public class DoorSegment {
 		}
 	}
 	
-    public DoorSegment(DoorSegment other) {
-        this.index = other.index;
-        this.reflexVertexIndex = other.reflexVertexIndex;
-        this.ccw = other.ccw;
-
-        // tiefe Kopie von reflex & onEdge
-        this.reflex = new MyPoint(other.reflex);
-        this.onEdge = new MyPoint(other.onEdge);
-
-        // tiefe Kopie von door
-        this.door = new Edge(other.door);
-
-        // tiefe Kopie der chain
-        this.chain = new ArrayList<>();
-        for (MyPoint p : other.chain) {
-            this.chain.add(new MyPoint(p));
-        }
-    }
-    
-    public DoorSegment copy() {
-        return new DoorSegment(this);
-    }
-	
 	public String toString() {
 		for(MyPoint p:chain) {
 			System.out.println(p.toString());
