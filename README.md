@@ -33,3 +33,5 @@ A stable Java application that lets you draw a polygon and explore circular visi
 
 - Java (Swing / AWT)
 
+This implementation of circular visibility  was made following the Algorithm of the Master Thesis of Mikkel Abrahamsen. https://hjemmesider.diku.dk/~jyrki/PE-lab/Mikkel/thesis.pdf . The Algorithm runs in O(n²), n = vertices.
+The implematntation of finding the tangent point on a segment, given two points, was made on the basis of "A Novel Method for Drawing a Circle Tangent to Three Circles Lying on a Plane by Straightedge, Compass, and Inversion Circles".
